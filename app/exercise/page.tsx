@@ -15,7 +15,15 @@ import ExerciseGuide from '@/components/ExerciseGuide';
 import { exerciseLibrary, getExercisesByCategory, ExerciseType } from '@/lib/exercises';
 
 export default function ExerciseTracking() {
-  const { storage, isKVAvailable, isLoading, hasMigrated } = useHealthStorage();
+  const { 
+    saveExerciseSession, 
+    getExerciseSessions,
+    getDailyAssessment,
+    isRedisAvailable, 
+    isLoading, 
+    hasMigrated,
+    storageStatus 
+  } = useHealthStorage();
   
   const [activeTab, setActiveTab] = useState('guide');
   const [selectedExercise, setSelectedExercise] = useState<ExerciseType | null>(null);
@@ -54,7 +62,7 @@ export default function ExerciseTracking() {
   useEffect(() => {
     const loadTodayAssessment = async () => {
       const today = new Date().toISOString().split('T')[0];
-      const assessment = await storage.getDailyAssessment(today);
+      const assessment = await getDailyAssessment(today);
       if (assessment?.morningAssessment?.exerciseReadinessScore) {
         setTodayReadiness(assessment.morningAssessment.exerciseReadinessScore);
         setHasCompletedAssessment(true);
@@ -66,7 +74,7 @@ export default function ExerciseTracking() {
     if (!isLoading) {
       loadTodayAssessment();
     }
-  }, [storage, isLoading]);
+  }, [getDailyAssessment, isLoading]);
 
   const regenerateWorkoutPlan = () => {
     setWorkoutPlanSeed(Date.now());
@@ -83,7 +91,7 @@ export default function ExerciseTracking() {
     };
     
     try {
-      await storage.saveExerciseSession(sessionData);
+      await saveExerciseSession(sessionData);
       
       // Reset the session
       setExerciseSession({
@@ -104,7 +112,7 @@ export default function ExerciseTracking() {
       setExerciseTime(0);
       setActiveTab('guide');
       
-      alert('Exercise session saved successfully!' + (isKVAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
+      alert('Exercise session saved successfully!' + (isRedisAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
     } catch (error) {
       alert('Error saving session. Please try again.');
     }
@@ -299,9 +307,9 @@ export default function ExerciseTracking() {
               </div>
             ) : (
               <div className="flex items-center space-x-1">
-                <div className={`w-2 h-2 rounded-full ${isKVAvailable ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${isRedisAvailable ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
                 <span className="text-xs text-gray-600">
-                  {isKVAvailable ? 'Cloud Sync' : 'Local Only'}
+                  {isRedisAvailable ? 'Cloud Sync' : 'Local Only'}
                 </span>
               </div>
             )}

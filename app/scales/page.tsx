@@ -38,7 +38,13 @@ const facitQuestions = [
 ];
 
 export default function FatigueScales() {
-  const { storage, isKVAvailable, isLoading } = useHealthStorage();
+  const { 
+    saveFatigueScale, 
+    getFatigueScales, 
+    isRedisAvailable, 
+    isLoading,
+    storageStatus 
+  } = useHealthStorage();
   
   const [activeTab, setActiveTab] = useState('fss');
   const [fssScores, setFssScores] = useState<number[]>(new Array(9).fill(1));
@@ -47,14 +53,14 @@ export default function FatigueScales() {
 
   useEffect(() => {
     const loadScales = async () => {
-      const scales = await storage.getFatigueScales();
+      const scales = await getFatigueScales();
       setRecentScales(scales.slice(-10));
     };
 
     if (!isLoading) {
       loadScales();
     }
-  }, [storage, isLoading]);
+  }, [getFatigueScales, isLoading]);
 
   const calculateFSS = (scores: number[]) => {
     const total = scores.reduce((sum, score) => sum + score, 0);
@@ -100,9 +106,9 @@ export default function FatigueScales() {
     };
 
     try {
-      await storage.saveFatigueScale(scale);
+      await saveFatigueScale(scale);
       setRecentScales(prev => [...prev, scale].slice(-10));
-      alert('FSS assessment saved!' + (isKVAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
+      alert('FSS assessment saved!' + (isRedisAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
     } catch (error) {
       alert('Error saving FSS assessment. Please try again.');
     }
@@ -120,9 +126,9 @@ export default function FatigueScales() {
     };
 
     try {
-      await storage.saveFatigueScale(scale);
+      await saveFatigueScale(scale);
       setRecentScales(prev => [...prev, scale].slice(-10));
-      alert('FACIT-F assessment saved!' + (isKVAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
+      alert('FACIT-F assessment saved!' + (isRedisAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
     } catch (error) {
       alert('Error saving FACIT-F assessment. Please try again.');
     }

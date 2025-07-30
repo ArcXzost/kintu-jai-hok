@@ -17,7 +17,13 @@ const commonSymptoms = [
 ];
 
 export default function DailyTracking() {
-  const { storage, isKVAvailable, isLoading } = useHealthStorage();
+  const { 
+    saveDailyAssessment, 
+    getDailyAssessment, 
+    isRedisAvailable, 
+    isLoading, 
+    storageStatus 
+  } = useHealthStorage();
   
   const [assessment, setAssessment] = useState<DailyAssessment>({
     date: new Date().toISOString().split('T')[0],
@@ -45,7 +51,7 @@ export default function DailyTracking() {
   useEffect(() => {
     const loadExistingAssessment = async () => {
       const today = new Date().toISOString().split('T')[0];
-      const existing = await storage.getDailyAssessment(today);
+      const existing = await getDailyAssessment(today);
       if (existing) {
         setAssessment(existing);
       }
@@ -54,7 +60,7 @@ export default function DailyTracking() {
     if (!isLoading) {
       loadExistingAssessment();
     }
-  }, [storage, isLoading]);
+  }, [getDailyAssessment, isLoading]);
 
   const updateMorningAssessment = (field: string, value: number) => {
     const newMorning = { ...assessment.morningAssessment!, [field]: value };
@@ -96,7 +102,7 @@ export default function DailyTracking() {
 
   const handleSave = async () => {
     try {
-      await storage.saveDailyAssessment(assessment);
+      await saveDailyAssessment(assessment);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
