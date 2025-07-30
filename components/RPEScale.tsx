@@ -2,11 +2,13 @@
 
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Slider } from './ui/slider';
 
 interface RPEScaleProps {
   value: number;
   onChange: (value: number) => void;
   showWarning?: boolean;
+  useSlider?: boolean;
 }
 
 const rpeDescriptions = [
@@ -17,14 +19,75 @@ const rpeDescriptions = [
   { value: 4, label: 'Somewhat heavy', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
   { value: 5, label: 'Heavy', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
   { value: 6, label: 'Very heavy', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { value: 7, label: 'Very heavy', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { value: 7, label: 'Very heavy +', color: 'bg-orange-100 text-orange-800 border-orange-200' },
   { value: 8, label: 'Very, very heavy', color: 'bg-red-100 text-red-800 border-red-200' },
-  { value: 9, label: 'Very, very heavy', color: 'bg-red-100 text-red-800 border-red-200' },
+  { value: 9, label: 'Very, very heavy +', color: 'bg-red-100 text-red-800 border-red-200' },
   { value: 10, label: 'Maximum', color: 'bg-red-100 text-red-800 border-red-200' },
 ];
 
-export default function RPEScale({ value, onChange, showWarning = true }: RPEScaleProps) {
+export default function RPEScale({ value, onChange, showWarning = true, useSlider = false }: RPEScaleProps) {
   const shouldShowWarning = showWarning && value >= 6;
+  const currentRPE = rpeDescriptions[value];
+
+  if (useSlider) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Rate of Perceived Exertion (RPE)</h3>
+          <div className="text-right">
+            <span className="text-2xl font-bold text-blue-600">{value}</span>
+            <p className="text-sm text-gray-600">{currentRPE?.label}</p>
+          </div>
+        </div>
+
+        {shouldShowWarning && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center space-x-2">
+            <AlertTriangle className="text-red-500" size={20} />
+            <p className="text-red-700 text-sm font-medium">
+              High exertion level! Consider stopping exercise and resting.
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <Slider
+            value={[value]}
+            onValueChange={(values) => onChange(values[0])}
+            max={10}
+            min={0}
+            step={1}
+            className="w-full"
+          />
+          
+          {/* RPE Scale Reference */}
+          <div className="grid grid-cols-11 gap-1 text-xs">
+            {rpeDescriptions.map((rpe) => (
+              <div key={rpe.value} className="text-center">
+                <div className={cn(
+                  "w-full h-2 rounded mb-1",
+                  value === rpe.value ? "bg-blue-600" : "bg-gray-200"
+                )} />
+                <span className={cn(
+                  "font-medium",
+                  value === rpe.value ? "text-blue-600" : "text-gray-500"
+                )}>
+                  {rpe.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Current Selection Display */}
+          <div className={cn(
+            "p-3 rounded-lg border-2 text-center",
+            currentRPE?.color
+          )}>
+            <span className="font-bold text-lg">RPE {value}: {currentRPE?.label}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

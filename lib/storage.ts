@@ -9,6 +9,11 @@ export interface DailyAssessment {
     exerciseReadinessScore: number;
   };
   exerciseSession?: {
+    exerciseType?: {
+      id: string;
+      name: string;
+      category: string;
+    };
     preExercise?: {
       time: string;
       lastMeal: number;

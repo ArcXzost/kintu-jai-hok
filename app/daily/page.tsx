@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
-import { HealthStorage, DailyAssessment } from '@/lib/storage';
+import { useHealthStorage } from '@/lib/useHealthStorage';
+import { DailyAssessment } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +17,8 @@ const commonSymptoms = [
 ];
 
 export default function DailyTracking() {
+  const { storage, isKVAvailable, isLoading } = useHealthStorage();
+  
   const [assessment, setAssessment] = useState<DailyAssessment>({
     date: new Date().toISOString().split('T')[0],
     morningAssessment: {
@@ -40,12 +43,18 @@ export default function DailyTracking() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const existing = HealthStorage.getDailyAssessment(today);
-    if (existing) {
-      setAssessment(existing);
+    const loadExistingAssessment = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const existing = await storage.getDailyAssessment(today);
+      if (existing) {
+        setAssessment(existing);
+      }
+    };
+
+    if (!isLoading) {
+      loadExistingAssessment();
     }
-  }, []);
+  }, [storage, isLoading]);
 
   const updateMorningAssessment = (field: string, value: number) => {
     const newMorning = { ...assessment.morningAssessment!, [field]: value };
@@ -85,10 +94,14 @@ export default function DailyTracking() {
     });
   };
 
-  const handleSave = () => {
-    HealthStorage.saveDailyAssessment(assessment);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const handleSave = async () => {
+    try {
+      await storage.saveDailyAssessment(assessment);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      alert('Error saving assessment. Please try again.');
+    }
   };
 
   const getReadinessColor = (score: number) => {

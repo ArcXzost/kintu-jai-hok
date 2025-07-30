@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Save, FileText, TrendingUp } from 'lucide-react';
-import { HealthStorage, FatigueScale } from '@/lib/storage';
+import { useHealthStorage } from '@/lib/useHealthStorage';
+import { FatigueScale } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -37,15 +38,23 @@ const facitQuestions = [
 ];
 
 export default function FatigueScales() {
+  const { storage, isKVAvailable, isLoading } = useHealthStorage();
+  
   const [activeTab, setActiveTab] = useState('fss');
   const [fssScores, setFssScores] = useState<number[]>(new Array(9).fill(1));
   const [facitScores, setFacitScores] = useState<number[]>(new Array(13).fill(0));
   const [recentScales, setRecentScales] = useState<FatigueScale[]>([]);
 
   useEffect(() => {
-    const scales = HealthStorage.getFatigueScales();
-    setRecentScales(scales.slice(-10));
-  }, []);
+    const loadScales = async () => {
+      const scales = await storage.getFatigueScales();
+      setRecentScales(scales.slice(-10));
+    };
+
+    if (!isLoading) {
+      loadScales();
+    }
+  }, [storage, isLoading]);
 
   const calculateFSS = (scores: number[]) => {
     const total = scores.reduce((sum, score) => sum + score, 0);
@@ -64,9 +73,9 @@ export default function FatigueScales() {
     let total = 0;
     scores.forEach((score, index) => {
       if (facitQuestions[index].reverse) {
-        total += (4 - score); // Reverse scoring for positive items
+        total += score; // Positive items: higher score = better (less fatigue)
       } else {
-        total += score;
+        total += (4 - score); // Negative items: reverse score (higher = less fatigue)
       }
     });
 
@@ -79,7 +88,7 @@ export default function FatigueScales() {
     return { total, interpretation };
   };
 
-  const saveFSS = () => {
+  const saveFSS = async () => {
     const result = calculateFSS(fssScores);
     const scale: FatigueScale = {
       id: Date.now().toString(),
@@ -90,12 +99,16 @@ export default function FatigueScales() {
       interpretation: result.interpretation
     };
 
-    HealthStorage.saveFatigueScale(scale);
-    setRecentScales(prev => [...prev, scale].slice(-10));
-    alert('FSS assessment saved!');
+    try {
+      await storage.saveFatigueScale(scale);
+      setRecentScales(prev => [...prev, scale].slice(-10));
+      alert('FSS assessment saved!' + (isKVAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
+    } catch (error) {
+      alert('Error saving FSS assessment. Please try again.');
+    }
   };
 
-  const saveFACIT = () => {
+  const saveFACIT = async () => {
     const result = calculateFACIT(facitScores);
     const scale: FatigueScale = {
       id: Date.now().toString(),
@@ -106,9 +119,13 @@ export default function FatigueScales() {
       interpretation: result.interpretation
     };
 
-    HealthStorage.saveFatigueScale(scale);
-    setRecentScales(prev => [...prev, scale].slice(-10));
-    alert('FACIT-F assessment saved!');
+    try {
+      await storage.saveFatigueScale(scale);
+      setRecentScales(prev => [...prev, scale].slice(-10));
+      alert('FACIT-F assessment saved!' + (isKVAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
+    } catch (error) {
+      alert('Error saving FACIT-F assessment. Please try again.');
+    }
   };
 
   const fssResult = calculateFSS(fssScores);
