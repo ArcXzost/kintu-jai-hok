@@ -2,27 +2,36 @@
 
 import { useEffect, useState } from 'react';
 import { Activity, Brain, Heart, Plus, TrendingUp } from 'lucide-react';
-import { HealthStorage, DailyAssessment } from '@/lib/storage';
+import { DailyAssessment } from '@/lib/storage';
+import { useHealthStorage } from '@/lib/useHealthStorage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import BottomNavigation from '@/components/BottomNavigation';
+import UserInfo from '@/components/UserInfo';
+import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function Dashboard() {
   const [todayAssessment, setTodayAssessment] = useState<DailyAssessment | null>(null);
   const [weeklyData, setWeeklyData] = useState<DailyAssessment[]>([]);
   const router = useRouter();
+  const { logout } = useAuth();
+  const { getDailyAssessment, getRecentAssessments } = useHealthStorage();
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const assessment = HealthStorage.getDailyAssessment(today);
-    setTodayAssessment(assessment);
+    const loadData = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const assessment = await getDailyAssessment(today);
+      setTodayAssessment(assessment);
 
-    // Get last 7 days data
-    const assessments = HealthStorage.getDailyAssessments();
-    const lastWeek = assessments.slice(-7);
-    setWeeklyData(lastWeek);
-  }, []);
+      // Get last 7 days data
+      const assessments = await getRecentAssessments();
+      const lastWeek = assessments.slice(-7);
+      setWeeklyData(lastWeek);
+    };
+
+    loadData();
+  }, [getDailyAssessment, getRecentAssessments]);
 
   const getReadinessColor = (score: number | undefined) => {
     if (!score) return 'bg-gray-200';
@@ -60,6 +69,9 @@ export default function Dashboard() {
             })}
           </p>
         </div>
+
+        {/* User Info */}
+        <UserInfo onLogout={logout} />
 
         {/* Today's Status */}
         <Card className="mb-6">

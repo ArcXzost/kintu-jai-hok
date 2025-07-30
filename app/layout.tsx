@@ -1,6 +1,8 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { AuthProvider } from '@/lib/auth';
+import AuthGuard from '@/components/AuthGuard';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -26,9 +28,13 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body className={`${inter.className} bg-gray-50 antialiased`}>
-        <div className="min-h-screen pb-20">
-          {children}
-        </div>
+        <AuthProvider>
+          <AuthGuard>
+            <div className="min-h-screen pb-20">
+              {children}
+            </div>
+          </AuthGuard>
+        </AuthProvider>
       </body>
     </html>
   );

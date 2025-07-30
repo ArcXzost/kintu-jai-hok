@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Download, BarChart3, TrendingUp, Calendar } from 'lucide-react';
-import { HealthStorage, DailyAssessment, FatigueScale } from '@/lib/storage';
+import { DailyAssessment, FatigueScale } from '@/lib/storage';
+import { useHealthStorage } from '@/lib/useHealthStorage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import BottomNavigation from '@/components/BottomNavigation';
@@ -10,14 +11,21 @@ import BottomNavigation from '@/components/BottomNavigation';
 export default function Reports() {
   const [dailyData, setDailyData] = useState<DailyAssessment[]>([]);
   const [fatigueScales, setFatigueScales] = useState<FatigueScale[]>([]);
+  const { getRecentAssessments, getFatigueScales, exportAllData } = useHealthStorage();
 
   useEffect(() => {
-    setDailyData(HealthStorage.getDailyAssessments());
-    setFatigueScales(HealthStorage.getFatigueScales());
-  }, []);
+    const loadData = async () => {
+      const assessments = await getRecentAssessments();
+      const scales = await getFatigueScales();
+      setDailyData(assessments);
+      setFatigueScales(scales);
+    };
 
-  const exportData = () => {
-    const dataStr = HealthStorage.exportData();
+    loadData();
+  }, [getRecentAssessments, getFatigueScales]);
+
+  const exportData = async () => {
+    const dataStr = await exportAllData();
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');

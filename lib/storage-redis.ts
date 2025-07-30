@@ -3,6 +3,7 @@ import type {
   DailyAssessment, 
   FatigueScale
 } from './storage';
+import { UserManager } from './user';
 
 // Types for Redis storage
 type Assessment = DailyAssessment;
@@ -16,8 +17,13 @@ type HealthData = {
 export class HealthStorageRedis {
   private client: any;
   private isConnected = false;
+  private userPrefix: string;
 
-  constructor() {
+  constructor(userId?: string) {
+    // Use provided userId or default for server-side calls
+    const finalUserId = userId || 'default_user';
+    this.userPrefix = `user:${finalUserId}:`;
+    
     // Initialize Redis client with your URL
     if (typeof window === 'undefined' && process.env.REDIS_URL) {
       this.client = createClient({
@@ -25,12 +31,10 @@ export class HealthStorageRedis {
       });
       
       this.client.on('error', (err: any) => {
-        console.warn('Redis connection error:', err);
         this.isConnected = false;
       });
       
       this.client.on('connect', () => {
-        console.log('Connected to Redis');
         this.isConnected = true;
       });
     }
@@ -51,7 +55,6 @@ export class HealthStorageRedis {
         this.isConnected = true;
         return true;
       } catch (error) {
-        console.warn('Failed to connect to Redis:', error);
         return false;
       }
     }
@@ -68,13 +71,13 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return;
     
     try {
-      const key = `assessment:${assessment.date}`;
+      const key = `${this.userPrefix}assessment:${assessment.date}`;
       await this.client.setEx(key, 86400 * 30, JSON.stringify(assessment)); // 30 days TTL
       
-      // Add to assessments list
-      await this.client.lPush('assessments', assessment.date);
+      // Add to user's assessments list
+      await this.client.lPush(`${this.userPrefix}assessments`, assessment.date);
     } catch (error) {
-      console.warn('Failed to save assessment to Redis:', error);
+      // Silent error - no logging
     }
   }
 
@@ -82,10 +85,9 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return null;
     
     try {
-      const data = await this.client.get(`assessment:${date}`);
+      const data = await this.client.get(`${this.userPrefix}assessment:${date}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.warn('Failed to get assessment from Redis:', error);
       return null;
     }
   }
@@ -94,7 +96,7 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return [];
     
     try {
-      const dates = await this.client.lRange('assessments', 0, -1);
+      const dates = await this.client.lRange(`${this.userPrefix}assessments`, 0, -1);
       const assessments: Assessment[] = [];
       
       for (const date of dates) {
@@ -106,7 +108,6 @@ export class HealthStorageRedis {
       
       return assessments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
-      console.warn('Failed to get assessments from Redis:', error);
       return [];
     }
   }
@@ -115,10 +116,10 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return;
     
     try {
-      await this.client.del(`assessment:${date}`);
-      await this.client.lRem('assessments', 0, date);
+      await this.client.del(`${this.userPrefix}assessment:${date}`);
+      await this.client.lRem(`${this.userPrefix}assessments`, 0, date);
     } catch (error) {
-      console.warn('Failed to delete assessment from Redis:', error);
+      // Silent error
     }
   }
 
@@ -127,13 +128,13 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return;
     
     try {
-      const key = `fatigue_scale:${scale.id}`;
+      const key = `${this.userPrefix}fatigue_scale:${scale.id}`;
       await this.client.setEx(key, 86400 * 30, JSON.stringify(scale)); // 30 days TTL
       
-      // Add to fatigue scales list
-      await this.client.lPush('fatigue_scales', scale.id);
+      // Add to user's fatigue scales list
+      await this.client.lPush(`${this.userPrefix}fatigue_scales`, scale.id);
     } catch (error) {
-      console.warn('Failed to save fatigue scale to Redis:', error);
+      // Silent error
     }
   }
 
@@ -141,10 +142,9 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return null;
     
     try {
-      const data = await this.client.get(`fatigue_scale:${id}`);
+      const data = await this.client.get(`${this.userPrefix}fatigue_scale:${id}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.warn('Failed to get fatigue scale from Redis:', error);
       return null;
     }
   }
@@ -153,7 +153,7 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return [];
     
     try {
-      const ids = await this.client.lRange('fatigue_scales', 0, -1);
+      const ids = await this.client.lRange(`${this.userPrefix}fatigue_scales`, 0, -1);
       const scales: FatigueScale[] = [];
       
       for (const id of ids) {
@@ -165,7 +165,6 @@ export class HealthStorageRedis {
       
       return scales.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
-      console.warn('Failed to get fatigue scales from Redis:', error);
       return [];
     }
   }
@@ -174,10 +173,10 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return;
     
     try {
-      await this.client.del(`fatigue_scale:${id}`);
-      await this.client.lRem('fatigue_scales', 0, id);
+      await this.client.del(`${this.userPrefix}fatigue_scale:${id}`);
+      await this.client.lRem(`${this.userPrefix}fatigue_scales`, 0, id);
     } catch (error) {
-      console.warn('Failed to delete fatigue scale from Redis:', error);
+      // Silent error
     }
   }
 
@@ -186,13 +185,13 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return;
     
     try {
-      const key = `exercise_session:${session.id}`;
+      const key = `${this.userPrefix}exercise_session:${session.id}`;
       await this.client.setEx(key, 86400 * 30, JSON.stringify(session)); // 30 days TTL
       
-      // Add to exercise sessions list
-      await this.client.lPush('exercise_sessions', session.id);
+      // Add to user's exercise sessions list
+      await this.client.lPush(`${this.userPrefix}exercise_sessions`, session.id);
     } catch (error) {
-      console.warn('Failed to save exercise session to Redis:', error);
+      // Silent error
     }
   }
 
@@ -200,10 +199,9 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return null;
     
     try {
-      const data = await this.client.get(`exercise_session:${id}`);
+      const data = await this.client.get(`${this.userPrefix}exercise_session:${id}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.warn('Failed to get exercise session from Redis:', error);
       return null;
     }
   }
@@ -212,7 +210,7 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return [];
     
     try {
-      const ids = await this.client.lRange('exercise_sessions', 0, -1);
+      const ids = await this.client.lRange(`${this.userPrefix}exercise_sessions`, 0, -1);
       const sessions: ExerciseSession[] = [];
       
       for (const id of ids) {
@@ -224,7 +222,6 @@ export class HealthStorageRedis {
       
       return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
-      console.warn('Failed to get exercise sessions from Redis:', error);
       return [];
     }
   }
@@ -233,10 +230,10 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return;
     
     try {
-      await this.client.del(`exercise_session:${id}`);
-      await this.client.lRem('exercise_sessions', 0, id);
+      await this.client.del(`${this.userPrefix}exercise_session:${id}`);
+      await this.client.lRem(`${this.userPrefix}exercise_sessions`, 0, id);
     } catch (error) {
-      console.warn('Failed to delete exercise session from Redis:', error);
+      // Silent error
     }
   }
 
@@ -245,8 +242,6 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return;
     
     try {
-      console.log('Migrating data to Redis...');
-      
       // Migrate assessments
       for (const assessment of data.assessments) {
         await this.saveAssessment(assessment);
@@ -261,10 +256,8 @@ export class HealthStorageRedis {
       for (const session of data.exerciseSessions) {
         await this.saveExerciseSession(session);
       }
-      
-      console.log('Migration to Redis completed');
     } catch (error) {
-      console.warn('Failed to migrate data to Redis:', error);
+      // Silent error
     }
   }
 
@@ -280,25 +273,25 @@ export class HealthStorageRedis {
     if (!(await this.ensureConnection())) return;
     
     try {
-      // Get all keys and delete them
-      const assessmentIds = await this.client.lRange('assessments', 0, -1);
-      const fatigueScaleIds = await this.client.lRange('fatigue_scales', 0, -1);
-      const exerciseSessionIds = await this.client.lRange('exercise_sessions', 0, -1);
+      // Get all user-specific keys and delete them
+      const assessmentIds = await this.client.lRange(`${this.userPrefix}assessments`, 0, -1);
+      const fatigueScaleIds = await this.client.lRange(`${this.userPrefix}fatigue_scales`, 0, -1);
+      const exerciseSessionIds = await this.client.lRange(`${this.userPrefix}exercise_sessions`, 0, -1);
       
       const keysToDelete = [
-        'assessments',
-        'fatigue_scales', 
-        'exercise_sessions',
-        ...assessmentIds.map((id: string) => `assessment:${id}`),
-        ...fatigueScaleIds.map((id: string) => `fatigue_scale:${id}`),
-        ...exerciseSessionIds.map((id: string) => `exercise_session:${id}`)
+        `${this.userPrefix}assessments`,
+        `${this.userPrefix}fatigue_scales`, 
+        `${this.userPrefix}exercise_sessions`,
+        ...assessmentIds.map((id: string) => `${this.userPrefix}assessment:${id}`),
+        ...fatigueScaleIds.map((id: string) => `${this.userPrefix}fatigue_scale:${id}`),
+        ...exerciseSessionIds.map((id: string) => `${this.userPrefix}exercise_session:${id}`)
       ];
       
       if (keysToDelete.length > 0) {
         await this.client.del(keysToDelete);
       }
     } catch (error) {
-      console.warn('Failed to clear Redis data:', error);
+      // Silent error
     }
   }
 
@@ -308,7 +301,7 @@ export class HealthStorageRedis {
         await this.client.disconnect();
         this.isConnected = false;
       } catch (error) {
-        console.warn('Failed to disconnect from Redis:', error);
+        // Silent error
       }
     }
   }

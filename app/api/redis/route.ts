@@ -7,8 +7,10 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action');
     const id = searchParams.get('id');
     const type = searchParams.get('type');
-
-    const redisStorage = new HealthStorageRedis();
+    
+    // Get user ID from header or use default
+    const userId = request.headers.get('x-user-id') || 'default_user';
+    const redisStorage = new HealthStorageRedis(userId);
     
     if (!(await redisStorage.isAvailable())) {
       return NextResponse.json({ error: 'Redis not available' }, { status: 503 });
@@ -41,7 +43,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action or parameters' }, { status: 400 });
   } catch (error) {
-    console.error('Redis API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -53,7 +54,10 @@ export async function POST(request: NextRequest) {
     const type = searchParams.get('type');
     
     const body = await request.json();
-    const redisStorage = new HealthStorageRedis();
+    
+    // Get user ID from header or use default
+    const userId = request.headers.get('x-user-id') || 'default_user';
+    const redisStorage = new HealthStorageRedis(userId);
     
     if (!(await redisStorage.isAvailable())) {
       return NextResponse.json({ error: 'Redis not available' }, { status: 503 });
@@ -84,7 +88,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action or parameters' }, { status: 400 });
   } catch (error) {
-    console.error('Redis API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -99,7 +102,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing type or id' }, { status: 400 });
     }
 
-    const redisStorage = new HealthStorageRedis();
+    // Get user ID from header or use default
+    const userId = request.headers.get('x-user-id') || 'default_user';
+    const redisStorage = new HealthStorageRedis(userId);
     
     if (!(await redisStorage.isAvailable())) {
       return NextResponse.json({ error: 'Redis not available' }, { status: 503 });
@@ -119,7 +124,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
   } catch (error) {
-    console.error('Redis API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
