@@ -21,7 +21,6 @@ export default function ExerciseTracking() {
     getDailyAssessment,
     isRedisAvailable, 
     isLoading, 
-    hasMigrated,
     storageStatus 
   } = useHealthStorage();
   
@@ -311,11 +310,6 @@ export default function ExerciseTracking() {
                 <span className="text-xs text-gray-600">
                   {isRedisAvailable ? 'Cloud Sync' : 'Local Only'}
                 </span>
-              </div>
-            )}
-            {hasMigrated && (
-              <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                ✅ Data Migrated
               </div>
             )}
           </div>
