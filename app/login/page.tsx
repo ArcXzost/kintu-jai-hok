@@ -81,7 +81,7 @@ export default function LoginPage() {
             <h1 className="text-2xl font-bold text-gray-900">Health Tracker</h1>
           </div>
           <p className="text-gray-600">
-            Track your thalassemia health journey with personalized insights
+            Track your health journey with personalized insights
           </p>
         </div>
 

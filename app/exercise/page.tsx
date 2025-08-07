@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Play, Pause, Square, AlertTriangle, Save, BookOpen, Heart, Dumbbell, Leaf, Youtube } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useHealthStorage } from '@/lib/useHealthStorage';
 import { DailyAssessment } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import ExerciseGuide from '@/components/ExerciseGuide';
 import { exerciseLibrary, getExercisesByCategory, ExerciseType } from '@/lib/exercises';
 
 export default function ExerciseTracking() {
+  const router = useRouter();
   const { 
     saveExerciseSession, 
     getExerciseSessions,
@@ -362,7 +364,7 @@ export default function ExerciseTracking() {
                             activities for today based on how you're feeling.
                           </p>
                           <Button 
-                            onClick={() => window.location.href = '/daily'}
+                            onClick={() => router.push('/daily')}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
                           >
                             Go to Morning Assessment
