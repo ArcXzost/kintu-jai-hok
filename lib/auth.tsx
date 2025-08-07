@@ -30,6 +30,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check if user is already logged in via session token
     const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY);
     if (sessionToken) {
+      // First, try to get user from sessionStorage cache
+      const cachedUser = sessionStorage.getItem('auth_user_cache');
+      const cacheTime = sessionStorage.getItem('auth_user_cache_time');
+      const now = Date.now();
+      
+      // Use cached user if less than 5 minutes old
+      if (cachedUser && cacheTime && (now - parseInt(cacheTime)) < 300000) {
+        try {
+          const user = JSON.parse(cachedUser);
+          setUser(user);
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          // Invalid cache, proceed with verification
+          sessionStorage.removeItem('auth_user_cache');
+          sessionStorage.removeItem('auth_user_cache_time');
+        }
+      }
+      
       verifySession(sessionToken);
     } else {
       setIsLoading(false);
@@ -50,11 +69,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (result.success) {
         setUser(result.user);
+        // Cache the user data
+        sessionStorage.setItem('auth_user_cache', JSON.stringify(result.user));
+        sessionStorage.setItem('auth_user_cache_time', Date.now().toString());
       } else {
         localStorage.removeItem(SESSION_TOKEN_KEY);
+        sessionStorage.removeItem('auth_user_cache');
+        sessionStorage.removeItem('auth_user_cache_time');
       }
     } catch (error) {
       localStorage.removeItem(SESSION_TOKEN_KEY);
+      sessionStorage.removeItem('auth_user_cache');
+      sessionStorage.removeItem('auth_user_cache_time');
     } finally {
       setIsLoading(false);
     }
@@ -125,8 +151,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     
-    setUser(null);
+    // Clear all auth-related storage
     localStorage.removeItem(SESSION_TOKEN_KEY);
+    sessionStorage.removeItem('auth_user_cache');
+    sessionStorage.removeItem('auth_user_cache_time');
+    
+    // Clear health storage caches
+    const keys = Object.keys(sessionStorage);
+    keys.forEach(key => {
+      if (key.startsWith('health-check-')) {
+        sessionStorage.removeItem(key);
+        sessionStorage.removeItem(`${key}-time`);
+      }
+    });
+    
+    setUser(null);
   };
 
   return (

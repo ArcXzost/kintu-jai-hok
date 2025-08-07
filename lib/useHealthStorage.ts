@@ -25,27 +25,61 @@ export function useHealthStorage() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    
     const initializeStorage = async () => {
       if (!user) {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
         return;
       }
 
       try {
-        // Check if Redis is available via API
+        // Check if Redis is available via API with caching
+        const cacheKey = `health-check-${user.id}`;
+        const cachedResult = sessionStorage.getItem(cacheKey);
+        const cacheTime = sessionStorage.getItem(`${cacheKey}-time`);
+        const now = Date.now();
+        
+        // Use cached result if less than 30 seconds old
+        if (cachedResult && cacheTime && (now - parseInt(cacheTime)) < 30000) {
+          if (isMounted) {
+            setIsRedisAvailable(cachedResult === 'true');
+            setIsLoading(false);
+          }
+          return;
+        }
+
         const response = await fetch('/api/redis?action=health-check', {
           headers: getHeaders()
         });
         const result = await response.json();
-        setIsRedisAvailable(result.healthy || false);
+        const isHealthy = result.healthy || false;
+        
+        // Cache the result
+        sessionStorage.setItem(cacheKey, isHealthy.toString());
+        sessionStorage.setItem(`${cacheKey}-time`, now.toString());
+        
+        if (isMounted) {
+          setIsRedisAvailable(isHealthy);
+        }
       } catch (error) {
-        setIsRedisAvailable(false);
+        if (isMounted) {
+          setIsRedisAvailable(false);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     initializeStorage();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   const getStorageStatus = () => {

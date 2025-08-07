@@ -3,6 +3,7 @@
 import { Home, Calendar, Activity, FileText, BarChart3 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useCallback, memo } from 'react';
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
@@ -12,9 +13,16 @@ const navItems = [
   { href: '/reports', label: 'Reports', icon: BarChart3 },
 ];
 
-export default function BottomNavigation() {
+function BottomNavigation() {
   const pathname = usePathname();
   const router = useRouter();
+
+  const handleNavigation = useCallback((href: string) => {
+    // Prevent navigation to the same page
+    if (pathname !== href) {
+      router.push(href);
+    }
+  }, [pathname, router]);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-1 py-2 z-50">
@@ -24,7 +32,7 @@ export default function BottomNavigation() {
           return (
             <button
               key={href}
-              onClick={() => router.push(href)}
+              onClick={() => handleNavigation(href)}
               className={cn(
                 "flex flex-col items-center justify-center min-w-[60px] h-12 rounded-lg transition-colors",
                 isActive 
@@ -41,3 +49,6 @@ export default function BottomNavigation() {
     </nav>
   );
 }
+
+// Memoize to prevent unnecessary re-renders
+export default memo(BottomNavigation);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Play, Pause, Square, AlertTriangle, Save, BookOpen, Heart, Dumbbell, Leaf, Youtube } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useHealthStorage } from '@/lib/useHealthStorage';
@@ -59,21 +59,32 @@ export default function ExerciseTracking() {
   const [todayReadiness, setTodayReadiness] = useState(0);
   const [hasCompletedAssessment, setHasCompletedAssessment] = useState(false);
   const [workoutPlanSeed, setWorkoutPlanSeed] = useState(Date.now()); // For regenerating plans
+  const [isLoadingAssessment, setIsLoadingAssessment] = useState(true); // Loading state for assessment
 
   useEffect(() => {
     const loadTodayAssessment = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const assessment = await getDailyAssessment(today);
-      if (assessment?.morningAssessment?.exerciseReadinessScore) {
-        setTodayReadiness(assessment.morningAssessment.exerciseReadinessScore);
-        setHasCompletedAssessment(true);
-      } else {
+      setIsLoadingAssessment(true);
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const assessment = await getDailyAssessment(today);
+        if (assessment?.morningAssessment?.exerciseReadinessScore) {
+          setTodayReadiness(assessment.morningAssessment.exerciseReadinessScore);
+          setHasCompletedAssessment(true);
+        } else {
+          setHasCompletedAssessment(false);
+        }
+      } catch (error) {
+        console.error('Failed to load assessment:', error);
         setHasCompletedAssessment(false);
+      } finally {
+        setIsLoadingAssessment(false);
       }
     };
 
     if (!isLoading) {
       loadTodayAssessment();
+    } else {
+      setIsLoadingAssessment(false);
     }
   }, [getDailyAssessment, isLoading]);
 
@@ -214,8 +225,8 @@ export default function ExerciseTracking() {
     return 15; // Higher default fallback
   };
 
-  // Function to create a balanced workout within time limit
-  const createWorkoutPlan = (availableExercises: typeof exerciseLibrary, maxDuration: number, seed: number) => {
+  // Function to create a balanced workout within time limit - memoized for performance
+  const createWorkoutPlan = useCallback((availableExercises: typeof exerciseLibrary, maxDuration: number, seed: number) => {
     const plan: { exercise: typeof exerciseLibrary[0], duration: number }[] = [];
     let remainingTime = maxDuration;
     
@@ -291,7 +302,14 @@ export default function ExerciseTracking() {
     }
 
     return plan;
-  };
+  }, []);
+
+  // Memoize workout plan generation to prevent expensive recalculations
+  const currentWorkoutPlan = useMemo(() => {
+    if (!hasCompletedAssessment) return [];
+    const recommendation = getReadinessRecommendation(todayReadiness);
+    return createWorkoutPlan(recommendation.exercises, recommendation.maxDuration, workoutPlanSeed);
+  }, [hasCompletedAssessment, todayReadiness, workoutPlanSeed, createWorkoutPlan]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -422,7 +440,7 @@ export default function ExerciseTracking() {
 
                       {(() => {
                         const recommendation = getReadinessRecommendation(todayReadiness);
-                        const workoutPlan = createWorkoutPlan(recommendation.exercises, recommendation.maxDuration, workoutPlanSeed);
+                        const workoutPlan = currentWorkoutPlan; // Use memoized plan
                         const totalTime = workoutPlan.reduce((sum, item) => sum + item.duration, 0);
 
                         if (workoutPlan.length === 0) {
