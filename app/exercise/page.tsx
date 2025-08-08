@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, startTransition } from 'react';
+import dynamic from 'next/dynamic';
 import { Play, Pause, Square, AlertTriangle, Save, BookOpen, Heart, Dumbbell, Leaf, Youtube } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useHealthStorage } from '@/lib/useHealthStorage';
@@ -10,10 +11,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import BottomNavigation from '@/components/BottomNavigation';
-import RPEScale from '@/components/RPEScale';
-import Slider from '@/components/Slider';
-import ExerciseGuide from '@/components/ExerciseGuide';
-import { exerciseLibrary, getExercisesByCategory, ExerciseType } from '@/lib/exercises';
+import type { ExerciseType } from '@/lib/exercises';
+
+// Lazy-load heavier components to reduce initial JS cost
+const RPEScale = dynamic(() => import('@/components/RPEScale'), { ssr: false, loading: () => <div className="h-24 rounded bg-gray-100 animate-pulse" /> });
+const Slider = dynamic(() => import('@/components/Slider'), { ssr: false, loading: () => <div className="h-8 rounded bg-gray-100 animate-pulse" /> });
+const ExerciseGuide = dynamic(() => import('@/components/ExerciseGuide'), { ssr: false, loading: () => (
+  <div className="space-y-3">
+    <div className="h-6 w-48 bg-gray-100 rounded animate-pulse" />
+    <div className="h-24 w-full bg-white rounded-lg shadow-sm animate-pulse" />
+  </div>
+) });
 
 export default function ExerciseTracking() {
   const router = useRouter();
@@ -26,7 +34,8 @@ export default function ExerciseTracking() {
     storageStatus 
   } = useHealthStorage();
   
-  const [activeTab, setActiveTab] = useState('guide');
+  const [activeTab, _setActiveTab] = useState('guide');
+  const setActiveTab = (val: string) => startTransition(() => _setActiveTab(val));
   const [selectedExercise, setSelectedExercise] = useState<ExerciseType | null>(null);
   const [exerciseSession, setExerciseSession] = useState({
     preExercise: {
@@ -54,12 +63,39 @@ export default function ExerciseTracking() {
   const [currentRPE, setCurrentRPE] = useState(0);
   const [talkTest, setTalkTest] = useState(true);
   const [showAllExercises, setShowAllExercises] = useState<string | false>(false);
+  const [library, setLibrary] = useState<ExerciseType[] | null>(null);
+  const [listReady, setListReady] = useState(false);
 
   // Get today's readiness score for exercise recommendations
   const [todayReadiness, setTodayReadiness] = useState(0);
   const [hasCompletedAssessment, setHasCompletedAssessment] = useState(false);
   const [workoutPlanSeed, setWorkoutPlanSeed] = useState(Date.now()); // For regenerating plans
   const [isLoadingAssessment, setIsLoadingAssessment] = useState(true); // Loading state for assessment
+
+  // Load exercise library lazily to shrink initial JS
+  useEffect(() => {
+    let mounted = true;
+    // Defer to idle if possible
+    const load = () => {
+      import('@/lib/exercises').then(mod => {
+        if (mounted) setLibrary(mod.exerciseLibrary);
+      });
+    };
+    if (typeof (window as any).requestIdleCallback === 'function') {
+      (window as any).requestIdleCallback(load, { timeout: 500 });
+    } else {
+      setTimeout(load, 0);
+    }
+    // Also defer rendering big lists until after first paint
+    const readyTimer = setTimeout(() => setListReady(true), 150);
+    return () => { mounted = false; clearTimeout(readyTimer); };
+  }, []);
+
+  // Local helper using the lazily loaded library
+  const getExercisesByCategoryLocal = useCallback(
+    (category: 'cardio' | 'strength' | 'flexibility') => (library || []).filter(e => e.category === category),
+    [library]
+  );
 
   useEffect(() => {
     const loadTodayAssessment = async () => {
@@ -81,7 +117,7 @@ export default function ExerciseTracking() {
       }
     };
 
-    if (!isLoading) {
+  if (!isLoading) {
       loadTodayAssessment();
     } else {
       setIsLoadingAssessment(false);
@@ -131,10 +167,10 @@ export default function ExerciseTracking() {
   };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isExercising) {
       interval = setInterval(() => {
-        setExerciseTime(prev => prev + 1);
+        setExerciseTime((prev: number) => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -169,19 +205,20 @@ export default function ExerciseTracking() {
       symptoms: [] // Could add symptom selection
     };
 
-    setExerciseSession(prev => ({
+  setExerciseSession((prev) => ({
       ...prev,
       duringExercise: [...prev.duringExercise, newEntry]
     }));
   };
 
   const getReadinessRecommendation = (score: number) => {
+    const lib = library || [];
     if (score >= 40) return { 
       color: 'text-green-600', 
       bgColor: 'bg-green-50 border-green-200',
       text: 'Excellent! Great day for exercise!', 
       description: 'You can do any exercise with longer durations and moderate intensity.',
-      exercises: exerciseLibrary,
+      exercises: lib,
       maxDuration: 30,
       icon: '🟢'
     };
@@ -190,7 +227,7 @@ export default function ExerciseTracking() {
       bgColor: 'bg-yellow-50 border-yellow-200',
       text: 'Good - Light to moderate exercise recommended', 
       description: 'Focus on basic cardio and gentle strength exercises.',
-      exercises: exerciseLibrary.filter(e => e.intensity === 'light' || e.intensity === 'moderate'),
+      exercises: lib.filter(e => e.intensity === 'light' || e.intensity === 'moderate'),
       maxDuration: 28,
       icon: '🟡'
     };
@@ -199,7 +236,7 @@ export default function ExerciseTracking() {
       bgColor: 'bg-orange-50 border-orange-200',
       text: 'Caution - Gentle activity only', 
       description: 'Stick to flexibility exercises and very light movement.',
-      exercises: exerciseLibrary.filter(e => e.category === 'flexibility' || e.intensity === 'light'),
+      exercises: lib.filter(e => e.category === 'flexibility' || e.intensity === 'light'),
       maxDuration: 25,
       icon: '🟠'
     };
@@ -208,7 +245,7 @@ export default function ExerciseTracking() {
       bgColor: 'bg-red-50 border-red-200',
       text: 'Rest day recommended', 
       description: 'Focus on breathing exercises and complete rest today.',
-      exercises: exerciseLibrary.filter(e => e.name.toLowerCase().includes('breathing') || e.category === 'flexibility'),
+      exercises: lib.filter(e => e.name.toLowerCase().includes('breathing') || e.category === 'flexibility'),
       maxDuration: 20,
       icon: '🔴'
     };
@@ -226,8 +263,8 @@ export default function ExerciseTracking() {
   };
 
   // Function to create a balanced workout within time limit - memoized for performance
-  const createWorkoutPlan = useCallback((availableExercises: typeof exerciseLibrary, maxDuration: number, seed: number) => {
-    const plan: { exercise: typeof exerciseLibrary[0], duration: number }[] = [];
+  const createWorkoutPlan = useCallback((availableExercises: ExerciseType[], maxDuration: number, seed: number) => {
+    const plan: { exercise: ExerciseType, duration: number }[] = [];
     let remainingTime = maxDuration;
     
     // Seeded random function for consistent randomness
@@ -243,7 +280,7 @@ export default function ExerciseTracking() {
     
     // Prioritize different categories for balance
     const categories = ['cardio', 'strength', 'flexibility'];
-    const selectedByCategory: { [key: string]: typeof exerciseLibrary } = {
+  const selectedByCategory: { [key: string]: ExerciseType[] } = {
       cardio: [],
       strength: [],
       flexibility: []
@@ -306,10 +343,10 @@ export default function ExerciseTracking() {
 
   // Memoize workout plan generation to prevent expensive recalculations
   const currentWorkoutPlan = useMemo(() => {
-    if (!hasCompletedAssessment) return [];
+    if (!hasCompletedAssessment || !library) return [];
     const recommendation = getReadinessRecommendation(todayReadiness);
     return createWorkoutPlan(recommendation.exercises, recommendation.maxDuration, workoutPlanSeed);
-  }, [hasCompletedAssessment, todayReadiness, workoutPlanSeed, createWorkoutPlan]);
+  }, [hasCompletedAssessment, todayReadiness, workoutPlanSeed, createWorkoutPlan, library]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -584,8 +621,8 @@ export default function ExerciseTracking() {
                         </p>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {['cardio', 'strength', 'flexibility'].map(category => {
-                            const allCategoryExercises = getExercisesByCategory(category);
+                          {(['cardio', 'strength', 'flexibility'] as const).map(category => {
+                            const allCategoryExercises = library ? getExercisesByCategoryLocal(category) : [];
                             const categoryInfo = {
                               cardio: { name: 'All Cardio', icon: Heart, color: 'text-red-500', bgColor: 'bg-red-50 hover:bg-red-100' },
                               strength: { name: 'All Strength', icon: Dumbbell, color: 'text-blue-500', bgColor: 'bg-blue-50 hover:bg-blue-100' },
@@ -606,7 +643,7 @@ export default function ExerciseTracking() {
                                     {categoryInfo[category as keyof typeof categoryInfo].name}
                                   </h4>
                                   <p className="text-sm text-gray-600">
-                                    {allCategoryExercises.length} exercises
+                                    {library ? allCategoryExercises.length : '…'} exercises
                                   </p>
                                 </CardContent>
                               </Card>
@@ -631,7 +668,12 @@ export default function ExerciseTracking() {
                             </CardHeader>
                             <CardContent>
                               <div className="grid gap-3">
-                                {typeof showAllExercises === 'string' && getExercisesByCategory(showAllExercises as 'cardio' | 'strength' | 'flexibility').map((exercise) => (
+                                {!library || !listReady ? (
+                                  Array.from({ length: 6 }).map((_, i) => (
+                                    <div key={i} className="h-16 w-full bg-gray-100 rounded animate-pulse" />
+                                  ))
+                                ) : (
+                                  typeof showAllExercises === 'string' && getExercisesByCategoryLocal(showAllExercises as 'cardio' | 'strength' | 'flexibility').map((exercise: ExerciseType) => (
                                   <div 
                                     key={exercise.id}
                                     className="p-3 border rounded-lg hover:bg-gray-50 transition-colors"
@@ -677,7 +719,8 @@ export default function ExerciseTracking() {
                                       </div>
                                     </div>
                                   </div>
-                                ))}
+                                  ))
+                                )}
                               </div>
                             </CardContent>
                           </Card>

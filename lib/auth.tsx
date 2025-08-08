@@ -35,8 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cacheTime = sessionStorage.getItem('auth_user_cache_time');
       const now = Date.now();
       
-      // Use cached user if less than 5 minutes old
-      if (cachedUser && cacheTime && (now - parseInt(cacheTime)) < 300000) {
+      // Use cached user if less than 10 minutes old (extended from 5)
+      if (cachedUser && cacheTime && (now - parseInt(cacheTime)) < 600000) {
         try {
           const user = JSON.parse(cachedUser);
           setUser(user);
@@ -46,6 +46,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Invalid cache, proceed with verification
           sessionStorage.removeItem('auth_user_cache');
           sessionStorage.removeItem('auth_user_cache_time');
+        }
+      }
+      
+      // Also cache in localStorage for better persistence across browser sessions
+      const localCachedUser = localStorage.getItem('auth_user_local_cache');
+      const localCacheTime = localStorage.getItem('auth_user_local_cache_time');
+      
+      // Use local cached user if less than 1 hour old
+      if (localCachedUser && localCacheTime && (now - parseInt(localCacheTime)) < 3600000) {
+        try {
+          const user = JSON.parse(localCachedUser);
+          setUser(user);
+          setIsLoading(false);
+          // Still verify session in background but don't wait for it
+          verifySession(sessionToken).catch(() => {
+            // If verification fails, clear cache and redirect
+            localStorage.removeItem(SESSION_TOKEN_KEY);
+            localStorage.removeItem('auth_user_local_cache');
+            localStorage.removeItem('auth_user_local_cache_time');
+            setUser(null);
+          });
+          return;
+        } catch (error) {
+          localStorage.removeItem('auth_user_local_cache');
+          localStorage.removeItem('auth_user_local_cache_time');
         }
       }
       
@@ -69,16 +94,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (result.success) {
         setUser(result.user);
-        // Cache the user data
+        // Cache the user data in both session and local storage
+        const now = Date.now().toString();
         sessionStorage.setItem('auth_user_cache', JSON.stringify(result.user));
-        sessionStorage.setItem('auth_user_cache_time', Date.now().toString());
+        sessionStorage.setItem('auth_user_cache_time', now);
+        localStorage.setItem('auth_user_local_cache', JSON.stringify(result.user));
+        localStorage.setItem('auth_user_local_cache_time', now);
       } else {
         localStorage.removeItem(SESSION_TOKEN_KEY);
+        localStorage.removeItem('auth_user_local_cache');
+        localStorage.removeItem('auth_user_local_cache_time');
         sessionStorage.removeItem('auth_user_cache');
         sessionStorage.removeItem('auth_user_cache_time');
       }
     } catch (error) {
       localStorage.removeItem(SESSION_TOKEN_KEY);
+      localStorage.removeItem('auth_user_local_cache');
+      localStorage.removeItem('auth_user_local_cache_time');
       sessionStorage.removeItem('auth_user_cache');
       sessionStorage.removeItem('auth_user_cache_time');
     } finally {
@@ -101,6 +133,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success) {
         setUser(result.user);
         localStorage.setItem(SESSION_TOKEN_KEY, result.sessionToken);
+        // Cache user data for faster subsequent loads
+        const now = Date.now().toString();
+        sessionStorage.setItem('auth_user_cache', JSON.stringify(result.user));
+        sessionStorage.setItem('auth_user_cache_time', now);
+        localStorage.setItem('auth_user_local_cache', JSON.stringify(result.user));
+        localStorage.setItem('auth_user_local_cache_time', now);
         return { success: true };
       } else {
         return { success: false, error: result.error };
@@ -125,6 +163,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success) {
         setUser(result.user);
         localStorage.setItem(SESSION_TOKEN_KEY, result.sessionToken);
+        // Cache user data for faster subsequent loads
+        const now = Date.now().toString();
+        sessionStorage.setItem('auth_user_cache', JSON.stringify(result.user));
+        sessionStorage.setItem('auth_user_cache_time', now);
+        localStorage.setItem('auth_user_local_cache', JSON.stringify(result.user));
+        localStorage.setItem('auth_user_local_cache_time', now);
         return { success: true };
       } else {
         return { success: false, error: result.error };
@@ -153,6 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Clear all auth-related storage
     localStorage.removeItem(SESSION_TOKEN_KEY);
+    localStorage.removeItem('auth_user_local_cache');
+    localStorage.removeItem('auth_user_local_cache_time');
     sessionStorage.removeItem('auth_user_cache');
     sessionStorage.removeItem('auth_user_cache_time');
     

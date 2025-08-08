@@ -107,12 +107,33 @@ export function useHealthStorage() {
   const getDailyAssessment = async (date: string): Promise<DailyAssessment | null> => {
     if (!isRedisAvailable || !user) return null;
 
+    const cacheKey = `assessment-${user.id}-${date}`;
+    const cacheTimeKey = `${cacheKey}-time`;
+    const now = Date.now();
+
+    // Try cache first (valid for 10 minutes)
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      const cachedAt = sessionStorage.getItem(cacheTimeKey);
+      if (cached && cachedAt && (now - parseInt(cachedAt)) < 10 * 60 * 1000) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      // ignore cache parse errors
+    }
+
     try {
       const response = await fetch(`/api/redis?action=get&type=assessment&id=${date}`, {
         headers: getHeaders()
       });
       const result = await response.json();
-      return result.data || null;
+      const data = result.data || null;
+      // Update cache
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify(data));
+        sessionStorage.setItem(cacheTimeKey, now.toString());
+      } catch { /* ignore quota errors */ }
+      return data;
     } catch (error) {
       return null;
     }

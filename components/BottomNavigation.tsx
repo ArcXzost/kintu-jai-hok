@@ -3,7 +3,7 @@
 import { Home, Calendar, Activity, FileText, BarChart3 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useCallback, memo } from 'react';
+import { useCallback, memo, useRef, useState, useEffect, startTransition } from 'react';
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
@@ -16,13 +16,52 @@ const navItems = [
 function BottomNavigation() {
   const pathname = usePathname();
   const router = useRouter();
+  const [isNavigating, setIsNavigating] = useState(false);
+  const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Proactively prefetch routes to make the first navigation instant
+  useEffect(() => {
+    try {
+      navItems.forEach(({ href }) => {
+        // Best-effort prefetch; ignore errors in dev
+        // @ts-ignore - prefetch exists on app router
+        router.prefetch?.(href);
+      });
+    } catch { /* noop */ }
+    // Also prefetch current path neighbors on path change
+  }, [router]);
 
   const handleNavigation = useCallback((href: string) => {
-    // Prevent navigation to the same page
-    if (pathname !== href) {
-      router.push(href);
+    // Prevent multiple rapid clicks and navigation to the same page
+    if (pathname === href || isNavigating) {
+      return;
     }
-  }, [pathname, router]);
+
+    setIsNavigating(true);
+    
+    // Clear any existing timeout
+    if (navigationTimeoutRef.current) {
+      clearTimeout(navigationTimeoutRef.current);
+    }
+
+    // Debounced navigation
+    navigationTimeoutRef.current = setTimeout(() => {
+      startTransition(() => {
+        router.push(href);
+      });
+      // give the router a tick to swap routes before unlocking
+      setTimeout(() => setIsNavigating(false), 50);
+    }, 150);
+  }, [pathname, router, isNavigating]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-1 py-2 z-50">
@@ -33,11 +72,20 @@ function BottomNavigation() {
             <button
               key={href}
               onClick={() => handleNavigation(href)}
+              onPointerEnter={() => {
+                // Warm up on hover/touch
+                try {
+                  // @ts-ignore - prefetch exists on app router
+                  router.prefetch?.(href);
+                } catch { /* noop */ }
+              }}
+              disabled={isNavigating}
               className={cn(
-                "flex flex-col items-center justify-center min-w-[60px] h-12 rounded-lg transition-colors",
+                "flex flex-col items-center justify-center min-w-[60px] h-12 rounded-lg transition-colors disabled:opacity-50",
                 isActive 
                   ? "text-blue-600 bg-blue-50" 
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50",
+                isNavigating && "cursor-wait"
               )}
             >
               <Icon size={20} />
