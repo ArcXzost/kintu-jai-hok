@@ -52,7 +52,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Acute dizziness or balance problems',
       'Severe joint pain in legs'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=8jRXSlJRvWE',
+    videoUrl: 'https://www.youtube.com/watch?v=u08lo0bESJc',
     videoTitle: '5-Minute Walking in Place for Beginners'
   },
   {
@@ -90,7 +90,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Acute illness',
       'Severe shoulder problems (for arm movements)'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=C0DPdy98e4Q',
+    videoUrl: 'https://www.youtube.com/watch?v=GSZ7XWcId5Q',
     videoTitle: 'Low Impact Step Touch Cardio'
   },
   {
@@ -128,7 +128,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Severe fatigue',
       'Balance problems'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=HOJWYcwLOBs',
+    videoUrl: 'https://www.youtube.com/shorts/FJ-seqGfwzA',
     videoTitle: 'Low Impact Jumping Jacks - Step Out Version'
   },
 
@@ -168,7 +168,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Recent injury to arms or shoulders',
       'Severe weakness'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=p3G4WRapkx8',
+    videoUrl: 'https://www.youtube.com/shorts/YWw-3rGaoT0',
     videoTitle: 'Wall Push-Ups for Beginners - Proper Form'
   },
   {
@@ -206,7 +206,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Recent leg injury',
       'Severe balance problems'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=t6lxWk5qbyI',
+    videoUrl: 'https://www.youtube.com/watch?v=4k1SPQ9tEMg',
     videoTitle: 'Chair Squats for Seniors - Safe Technique'
   },
   {
@@ -244,7 +244,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Recent falls',
       'Severe weakness'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=qQXWdRNg4l0',
+    videoUrl: 'https://www.youtube.com/watch?v=O_8EUJ7i-PI',
     videoTitle: 'Standing Knee Lifts Exercise - Balance Training'
   },
 
@@ -284,7 +284,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Severe joint pain',
       'Acute illness'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=2U8yDLxgLSw',
+    videoUrl: 'https://www.youtube.com/watch?v=CY6QP4ofwx4',
     videoTitle: 'Gentle Stretching for Seniors - Full Body'
   },
   {
@@ -322,7 +322,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Acute illness',
       'Severe shoulder problems'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=3VaKkTnLWw8',
+    videoUrl: 'https://www.youtube.com/watch?v=E00Utc1QQqA',
     videoTitle: 'Chair Exercises for Seniors - Complete Routine'
   },
   {
@@ -360,7 +360,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Acute breathing difficulties',
       'Severe anxiety (consult healthcare provider first)'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=DbDoBzGY3vo',
+    videoUrl: 'https://www.youtube.com/watch?v=iuv5EomIA9s',
     videoTitle: 'Gentle Breathing Exercises for Relaxation'
   },
 
@@ -400,7 +400,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Severe joint pain',
       'Recent falls'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=7mIEGl0j9LY',
+    videoUrl: 'https://www.youtube.com/watch?v=9DhwZqNJkIU',
     videoTitle: 'Senior Dance Fitness - Low Impact Fun'
   },
   {
@@ -438,7 +438,7 @@ export const exerciseLibrary: ExerciseType[] = [
       'Severe fatigue',
       'Recent illness'
     ],
-    videoUrl: 'https://www.youtube.com/watch?v=gC_L9qAHVJ8',
+    videoUrl: 'https://www.youtube.com/shorts/kN_7FoYAoXM',
     videoTitle: 'Interval Walking in Place - Beginner Cardio'
   }
 ];
