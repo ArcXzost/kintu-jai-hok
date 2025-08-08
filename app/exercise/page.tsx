@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useMemo, useCallback, startTransition } from 'react';
 import dynamic from 'next/dynamic';
-import { Play, Pause, Square, AlertTriangle, Save, BookOpen, Heart, Dumbbell, Leaf, Youtube } from 'lucide-react';
+import { Play, AlertTriangle, Save, BookOpen, Heart, Dumbbell, Leaf } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useHealthStorage } from '@/lib/useHealthStorage';
 import { DailyAssessment } from '@/lib/storage';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import BottomNavigation from '@/components/BottomNavigation';
 import type { ExerciseType } from '@/lib/exercises';
 
@@ -58,10 +59,7 @@ export default function ExerciseTracking() {
     }
   });
 
-  const [isExercising, setIsExercising] = useState(false);
-  const [exerciseTime, setExerciseTime] = useState(0);
-  const [currentRPE, setCurrentRPE] = useState(0);
-  const [talkTest, setTalkTest] = useState(true);
+  const [exerciseTime, setExerciseTime] = useState(30); // duration in minutes
   const [showAllExercises, setShowAllExercises] = useState<string | false>(false);
   const [library, setLibrary] = useState<ExerciseType[] | null>(null);
   const [listReady, setListReady] = useState(false);
@@ -72,23 +70,23 @@ export default function ExerciseTracking() {
   const [workoutPlanSeed, setWorkoutPlanSeed] = useState(Date.now()); // For regenerating plans
   const [isLoadingAssessment, setIsLoadingAssessment] = useState(true); // Loading state for assessment
 
-  // Load exercise library lazily to shrink initial JS
+  // Load exercise library with minimal defer; if cached in window, reuse instantly
   useEffect(() => {
     let mounted = true;
-    // Defer to idle if possible
-    const load = () => {
-      import('@/lib/exercises').then(mod => {
-        if (mounted) setLibrary(mod.exerciseLibrary);
-      });
-    };
-    if (typeof (window as any).requestIdleCallback === 'function') {
-      (window as any).requestIdleCallback(load, { timeout: 500 });
-    } else {
-      setTimeout(load, 0);
+    const cached = (window as any).__exerciseLibrary as ExerciseType[] | undefined;
+    if (cached) {
+      setLibrary(cached);
+      setListReady(true);
+      return () => { mounted = false; };
     }
-    // Also defer rendering big lists until after first paint
-    const readyTimer = setTimeout(() => setListReady(true), 150);
-    return () => { mounted = false; clearTimeout(readyTimer); };
+    import('@/lib/exercises').then(mod => {
+      if (mounted) {
+        setLibrary(mod.exerciseLibrary);
+        (window as any).__exerciseLibrary = mod.exerciseLibrary; // simple runtime cache
+        setListReady(true);
+      }
+    });
+    return () => { mounted = false; };
   }, []);
 
   // Local helper using the lazily loaded library
@@ -117,10 +115,8 @@ export default function ExerciseTracking() {
       }
     };
 
-  if (!isLoading) {
+    if (!isLoading) {
       loadTodayAssessment();
-    } else {
-      setIsLoadingAssessment(false);
     }
   }, [getDailyAssessment, isLoading]);
 
@@ -132,6 +128,7 @@ export default function ExerciseTracking() {
     // Save the exercise session using hybrid storage
     const today = new Date().toISOString().split('T')[0];
     const sessionData = {
+      id: `${today}-${Date.now()}`,
       date: today,
       exercise: selectedExercise?.name || 'Mixed Workout',
       duration: exerciseTime,
@@ -157,7 +154,7 @@ export default function ExerciseTracking() {
           satisfaction: 5
         }
       });
-      setExerciseTime(0);
+  setExerciseTime(30);
       setActiveTab('guide');
       
       alert('Exercise session saved successfully!' + (isRedisAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
@@ -166,50 +163,14 @@ export default function ExerciseTracking() {
     }
   };
 
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isExercising) {
-      interval = setInterval(() => {
-        setExerciseTime((prev: number) => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isExercising]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const startExercise = () => {
-    setIsExercising(true);
-    setActiveTab('during');
-  };
+  // Removed timer and during-exercise flow for simplicity
 
   const startExerciseWithGuide = (exercise: ExerciseType) => {
     setSelectedExercise(exercise);
     setActiveTab('pre');
   };
 
-  const stopExercise = () => {
-    setIsExercising(false);
-    setActiveTab('post');
-  };
-
-  const recordInterval = () => {
-    const newEntry = {
-      time: formatTime(exerciseTime),
-      rpe: currentRPE,
-      talkTest: talkTest,
-      symptoms: [] // Could add symptom selection
-    };
-
-  setExerciseSession((prev) => ({
-      ...prev,
-      duringExercise: [...prev.duringExercise, newEntry]
-    }));
-  };
+  // Removed during-exercise logging
 
   const getReadinessRecommendation = (score: number) => {
     const lib = library || [];
@@ -373,10 +334,9 @@ export default function ExerciseTracking() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="guide">Exercise Guide</TabsTrigger>
             <TabsTrigger value="pre">Pre-Exercise</TabsTrigger>
-            <TabsTrigger value="during">During</TabsTrigger>
             <TabsTrigger value="post">Post-Exercise</TabsTrigger>
           </TabsList>
 
@@ -384,9 +344,9 @@ export default function ExerciseTracking() {
             {selectedExercise ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Button 
-                    onClick={() => setSelectedExercise(null)} 
-                    variant="outline"
+                  <Button
+                    onClick={() => setSelectedExercise(null)}
+                    className={cn(buttonVariants({ variant: 'outline' }))}
                   >
                     ← Back to Exercise List
                   </Button>
@@ -462,11 +422,9 @@ export default function ExerciseTracking() {
                           <span>🎯</span>
                           <span>Today's 30-Minute Workout Plan</span>
                         </h3>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
+                        <Button
                           onClick={regenerateWorkoutPlan}
-                          className="text-xs"
+                          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'text-xs text-gray-800 hover:text-gray-900')}
                         >
                           🎲 New Plan
                         </Button>
@@ -550,20 +508,18 @@ export default function ExerciseTracking() {
                                           </div>
                                           <p className="text-sm text-gray-700 mb-3">{planItem.exercise.description}</p>
                                           <div className="flex items-center space-x-2">
-                                            <Badge variant="secondary" className="text-xs">
+                                            <Badge className={cn(badgeVariants({ variant: 'secondary' }), 'text-xs text-gray-800')}> 
                                               {planItem.exercise.category}
                                             </Badge>
-                                            <Badge variant="outline" className="text-xs">
+                                            <Badge className={cn(badgeVariants({ variant: 'outline' }), 'text-xs text-gray-800')}> 
                                               {planItem.exercise.intensity}
                                             </Badge>
                                           </div>
                                         </div>
                                         <div className="flex flex-col space-y-2 ml-4">
                                           <Button
-                                            variant="outline"
-                                            size="sm"
                                             onClick={() => setSelectedExercise(planItem.exercise)}
-                                            className="text-xs px-2 py-1"
+                                            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'text-xs px-2 py-1 text-gray-800 hover:text-gray-900')}
                                           >
                                             <BookOpen size={12} className="mr-1" />
                                             Guide
@@ -575,9 +531,7 @@ export default function ExerciseTracking() {
                                               rel="noopener noreferrer"
                                             >
                                               <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="text-xs px-2 py-1 w-full"
+                                                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'text-xs px-2 py-1 w-full text-gray-800 hover:text-gray-900')}
                                               >
                                                 <Play size={12} className="mr-1 text-red-500" />
                                                 Video
@@ -595,7 +549,7 @@ export default function ExerciseTracking() {
                             {/* Start Workout Button */}
                             <Card className="border-green-200 bg-green-50">
                               <CardContent className="p-4 text-center">
-                                <Button 
+                                <Button
                                   onClick={() => setActiveTab('pre')}
                                   className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold"
                                 >
@@ -657,10 +611,9 @@ export default function ExerciseTracking() {
                             <CardHeader>
                               <CardTitle className="flex items-center justify-between">
                                 <span>All {typeof showAllExercises === 'string' ? showAllExercises.charAt(0).toUpperCase() + showAllExercises.slice(1) : ''} Exercises</span>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
+                                <Button
                                   onClick={() => setShowAllExercises(false)}
+                                  className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
                                 >
                                   ✕ Close
                                 </Button>
@@ -686,13 +639,13 @@ export default function ExerciseTracking() {
                                         <h4 className="font-semibold">{exercise.name}</h4>
                                         <p className="text-sm text-gray-600 mt-1">{exercise.description}</p>
                                         <div className="flex items-center space-x-2 mt-2">
-                                          <Badge variant="secondary" className="text-xs">
+                                          <Badge className={cn(badgeVariants({ variant: 'secondary' }), 'text-xs text-gray-800')}>
                                             {exercise.duration}
                                           </Badge>
-                                          <Badge variant="outline" className="text-xs">
+                                          <Badge className={cn(badgeVariants({ variant: 'outline' }), 'text-xs text-gray-800')}>
                                             RPE {exercise.targetRPE.join('-')}
                                           </Badge>
-                                          <Badge variant="outline" className="text-xs">
+                                          <Badge className={cn(badgeVariants({ variant: 'outline' }), 'text-xs text-gray-800')}>
                                             {exercise.intensity}
                                           </Badge>
                                         </div>
@@ -805,101 +758,15 @@ export default function ExerciseTracking() {
                   />
                 </div>
 
-                <Button onClick={startExercise} className="w-full h-12 text-lg bg-green-600 hover:bg-green-700">
+                <Button onClick={() => setActiveTab('post')} className="w-full h-12 text-lg bg-green-600 hover:bg-green-700">
                   <Play size={20} className="mr-2" />
-                  Start Exercise
+                  Continue to Post-Exercise
                 </Button>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="during" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex justify-between items-center">
-                  <span>Exercise Session</span>
-                  <div className="text-center">
-                    <div className="text-3xl font-mono text-blue-600 font-bold">
-                      {formatTime(exerciseTime)}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {isExercising ? '⏱️ In Progress' : '⏸️ Paused'}
-                    </div>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {isExercising && (
-                  <>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-blue-800 text-sm font-medium flex items-center space-x-2">
-                        <span>📊</span>
-                        <span>Record your RPE every 5 minutes during exercise</span>
-                      </p>
-                    </div>
-
-                    <RPEScale
-                      value={currentRPE}
-                      onChange={setCurrentRPE}
-                      useSlider={true}
-                    />
-
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-gray-900">Talk Test</h4>
-                      <p className="text-sm text-gray-600">Can you hold a conversation while exercising?</p>
-                      <div className="flex space-x-4">
-                        <Button
-                          variant={talkTest ? "default" : "outline"}
-                          onClick={() => setTalkTest(true)}
-                          className="flex-1"
-                        >
-                          ✅ Can Talk
-                        </Button>
-                        <Button
-                          variant={!talkTest ? "destructive" : "outline"}
-                          onClick={() => setTalkTest(false)}
-                          className="flex-1"
-                        >
-                          ❌ Cannot Talk
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3">
-                      <Button onClick={recordInterval} className="h-12 bg-blue-600 hover:bg-blue-700">
-                        📝 Record Current RPE
-                      </Button>
-                      <Button onClick={stopExercise} variant="destructive" className="h-12">
-                        <Square size={20} className="mr-2" />
-                        Stop Exercise
-                      </Button>
-                    </div>
-                  </>
-                )}
-
-                {!isExercising && exerciseSession.duringExercise.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">Click "Start Exercise" in Pre-Exercise tab to begin</p>
-                  </div>
-                )}
-
-                {exerciseSession.duringExercise.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900">Exercise Log</h4>
-                    {exerciseSession.duringExercise.map((entry, index) => (
-                      <div key={index} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                        <span className="font-mono text-blue-600 font-bold">{entry.time}</span>
-                        <span className="font-semibold">RPE: {entry.rpe}</span>
-                        <span className={`text-sm font-medium ${entry.talkTest ? 'text-green-600' : 'text-red-600'}`}>
-                          {entry.talkTest ? '✅ Can talk' : '❌ Cannot talk'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {/* During tab removed */}
 
           <TabsContent value="post" className="space-y-6">
             <Card>
@@ -907,7 +774,16 @@ export default function ExerciseTracking() {
                 <CardTitle>Post-Exercise Recovery</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-4">
+                <Slider
+                  label="Duration (minutes)"
+                  value={exerciseTime}
+                  onChange={(value) => setExerciseTime(value)}
+                  min={0}
+                  max={120}
+                  description="How long did you exercise today?"
+                />
+
+                <div className="space-y-4 mt-6">
                   <h4 className="font-medium text-gray-900">Immediate RPE (Right After Exercise)</h4>
                   <p className="text-sm text-gray-600">How do you feel immediately after finishing exercise?</p>
                   <RPEScale

@@ -47,6 +47,7 @@ export default function DailyTracking() {
   });
 
   const [saved, setSaved] = useState(false);
+  const [alreadySavedToday, setAlreadySavedToday] = useState(false);
 
   useEffect(() => {
     const loadExistingAssessment = async () => {
@@ -54,6 +55,7 @@ export default function DailyTracking() {
       const existing = await getDailyAssessment(today);
       if (existing) {
         setAssessment(existing);
+        setAlreadySavedToday(!!existing.morningAssessment);
       }
     };
 
@@ -101,9 +103,14 @@ export default function DailyTracking() {
   };
 
   const handleSave = async () => {
+    if (alreadySavedToday) return;
     try {
       await saveDailyAssessment(assessment);
       setSaved(true);
+      setAlreadySavedToday(true);
+      // Force-refresh cache so other tabs (Exercise) see the latest immediately
+      const today = new Date().toISOString().split('T')[0];
+      await getDailyAssessment(today, { forceRefresh: true });
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
       alert('Error saving assessment. Please try again.');
@@ -127,7 +134,15 @@ export default function DailyTracking() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 py-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Daily Tracking</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center justify-between">
+          <span>Daily Tracking</span>
+          {alreadySavedToday && (
+            <span className="inline-flex items-center text-sm text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded">
+              <CheckCircle size={16} className="mr-1" />
+              Completed
+            </span>
+          )}
+        </h1>
 
         {/* Morning Assessment */}
         <Card className="mb-6">
@@ -211,7 +226,7 @@ export default function DailyTracking() {
                   <Checkbox
                     id={symptom}
                     checked={assessment.symptoms?.includes(symptom) || false}
-                    onCheckedChange={(checked) => updateSymptoms(symptom, checked as boolean)}
+                    onCheckedChange={(checked: boolean | 'indeterminate') => updateSymptoms(symptom, Boolean(checked))}
                   />
                   <label htmlFor={symptom} className="text-sm font-medium">
                     {symptom}
@@ -284,9 +299,15 @@ export default function DailyTracking() {
           <Button 
             onClick={handleSave} 
             className="w-full h-12 text-lg"
-            disabled={saved}
+            disabled={alreadySavedToday}
+            title={alreadySavedToday ? 'Assessment already saved for today' : undefined}
           >
-            {saved ? (
+            {alreadySavedToday ? (
+              <>
+                <CheckCircle size={20} className="mr-2" />
+                Assessment Saved Today
+              </>
+            ) : saved ? (
               <>
                 <CheckCircle size={20} className="mr-2" />
                 Saved!

@@ -1,6 +1,6 @@
-'use client';
+ 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DailyAssessment, FatigueScale } from './storage';
 import { useAuth } from './auth';
 
@@ -14,15 +14,18 @@ export function useHealthStorage() {
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
 
-  // Helper function to create headers with authentication
-  const getHeaders = () => {
-    const sessionToken = localStorage.getItem('health_app_session_token');
+  // Helper function to create headers with authentication (stable reference)
+  const getHeaders = useCallback(() => {
+    const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('health_app_session_token') : null;
     return {
       'Content-Type': 'application/json',
       'x-user-id': user?.id || 'unknown',
       'Authorization': sessionToken ? `Bearer ${sessionToken}` : ''
     };
-  };
+  }, [user?.id]);
+
+  // In-flight request de-duplication map
+  const inFlight = useRef<Map<string, Promise<any>>>(new Map());
 
   useEffect(() => {
     let isMounted = true;
@@ -90,7 +93,7 @@ export function useHealthStorage() {
   };
 
   // Assessment methods
-  const saveDailyAssessment = async (assessment: DailyAssessment): Promise<void> => {
+  const saveDailyAssessment = useCallback(async (assessment: DailyAssessment): Promise<void> => {
     if (!isRedisAvailable || !user) return;
 
     try {
@@ -99,65 +102,119 @@ export function useHealthStorage() {
         headers: getHeaders(),
         body: JSON.stringify(assessment)
       });
+      // Write-through cache for today's assessment to ensure immediate availability
+      try {
+        const cacheKey = `assessment-${user.id}-${assessment.date}`;
+        const cacheTimeKey = `${cacheKey}-time`;
+        sessionStorage.setItem(cacheKey, JSON.stringify(assessment));
+        sessionStorage.setItem(cacheTimeKey, Date.now().toString());
+      } catch { /* ignore quota errors */ }
     } catch (error) {
       console.error('Failed to save assessment:', error);
     }
-  };
+  }, [getHeaders, isRedisAvailable, user]);
 
-  const getDailyAssessment = async (date: string): Promise<DailyAssessment | null> => {
+  const getDailyAssessment = useCallback(async (date: string, opts?: { forceRefresh?: boolean }): Promise<DailyAssessment | null> => {
     if (!isRedisAvailable || !user) return null;
 
     const cacheKey = `assessment-${user.id}-${date}`;
     const cacheTimeKey = `${cacheKey}-time`;
     const now = Date.now();
 
-    // Try cache first (valid for 10 minutes)
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      const cachedAt = sessionStorage.getItem(cacheTimeKey);
-      if (cached && cachedAt && (now - parseInt(cachedAt)) < 10 * 60 * 1000) {
-        return JSON.parse(cached);
+    if (!opts?.forceRefresh) {
+      // Try cache first (valid for 10 minutes)
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        const cachedAt = sessionStorage.getItem(cacheTimeKey);
+        if (cached && cachedAt && (now - parseInt(cachedAt)) < 10 * 60 * 1000) {
+          return JSON.parse(cached);
+        }
+      } catch {
+        // ignore cache parse errors
       }
-    } catch {
-      // ignore cache parse errors
     }
 
+    // In-flight de-duplication for same assessment request
+    const flightKey = `get:assessment:${user.id}:${date}` + (opts?.forceRefresh ? ':force' : '');
+    const existing = inFlight.current.get(flightKey);
+    if (existing) return existing;
+
+    const p = (async () => {
     try {
       const response = await fetch(`/api/redis?action=get&type=assessment&id=${date}`, {
         headers: getHeaders()
       });
       const result = await response.json();
       const data = result.data || null;
-      // Update cache
+      // Update cache only if data exists; avoid caching null
       try {
-        sessionStorage.setItem(cacheKey, JSON.stringify(data));
-        sessionStorage.setItem(cacheTimeKey, now.toString());
+        if (data) {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+          sessionStorage.setItem(cacheTimeKey, now.toString());
+        } else {
+          sessionStorage.removeItem(cacheKey);
+          sessionStorage.removeItem(cacheTimeKey);
+        }
       } catch { /* ignore quota errors */ }
       return data;
     } catch (error) {
       return null;
-    }
-  };
+      } finally {
+        inFlight.current.delete(flightKey);
+      }
+    })();
+    inFlight.current.set(flightKey, p);
+    return p;
+  }, [getHeaders, isRedisAvailable, user]);
 
-  const getRecentAssessments = async (): Promise<DailyAssessment[]> => {
+  const getRecentAssessments = useCallback(async (): Promise<DailyAssessment[]> => {
     if (!isRedisAvailable || !user) return [];
 
+    // Cache list for a short TTL to avoid flooding (2 minutes)
+    const cacheKey = `assessments-${user.id}`;
+    const cacheTimeKey = `${cacheKey}-time`;
+    const now = Date.now();
     try {
-      const response = await fetch('/api/redis?action=get&type=assessments', {
-        headers: getHeaders()
-      });
-      const result = await response.json();
-      const assessments = result.data || [];
-      return assessments
-        .sort((a: DailyAssessment, b: DailyAssessment) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 30); // Last 30 days
-    } catch (error) {
-      return [];
-    }
-  };
+      const cached = sessionStorage.getItem(cacheKey);
+      const cachedAt = sessionStorage.getItem(cacheTimeKey);
+      if (cached && cachedAt && (now - parseInt(cachedAt)) < 2 * 60 * 1000) {
+        const parsed = JSON.parse(cached) as DailyAssessment[];
+        return parsed
+          .sort((a: DailyAssessment, b: DailyAssessment) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 30);
+      }
+    } catch { /* ignore cache errors */ }
+
+    const flightKey = `get:assessments:${user.id}`;
+    const existing = inFlight.current.get(flightKey);
+    if (existing) return existing;
+
+    const p = (async () => {
+      try {
+        const response = await fetch('/api/redis?action=get&type=assessments', {
+          headers: getHeaders()
+        });
+        const result = await response.json();
+        const assessments = (result.data || []) as DailyAssessment[];
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(assessments));
+          sessionStorage.setItem(cacheTimeKey, now.toString());
+        } catch { /* ignore quota errors */ }
+        return assessments
+          .sort((a: DailyAssessment, b: DailyAssessment) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 30);
+      } catch (error) {
+        return [];
+      } finally {
+        inFlight.current.delete(flightKey);
+      }
+    })();
+    inFlight.current.set(flightKey, p);
+    return p;
+  }, [getHeaders, isRedisAvailable, user]);
 
   // Fatigue Scale methods
-  const saveFatigueScale = async (scale: FatigueScale): Promise<void> => {
+  const saveFatigueScale = useCallback(async (scale: FatigueScale): Promise<void> => {
     if (!isRedisAvailable || !user) return;
 
     try {
@@ -169,24 +226,51 @@ export function useHealthStorage() {
     } catch (error) {
       console.error('Failed to save fatigue scale:', error);
     }
-  };
+  }, [getHeaders, isRedisAvailable, user]);
 
-  const getFatigueScales = async (): Promise<FatigueScale[]> => {
+  const getFatigueScales = useCallback(async (): Promise<FatigueScale[]> => {
     if (!isRedisAvailable || !user) return [];
 
+    // Short TTL cache (2 minutes) + in-flight de-dupe
+    const cacheKey = `fatigue-scales-${user.id}`;
+    const cacheTimeKey = `${cacheKey}-time`;
+    const now = Date.now();
     try {
-      const response = await fetch('/api/redis?action=get&type=fatigue-scales', {
-        headers: getHeaders()
-      });
-      const result = await response.json();
-      return result.data || [];
-    } catch (error) {
-      return [];
-    }
-  };
+      const cached = sessionStorage.getItem(cacheKey);
+      const cachedAt = sessionStorage.getItem(cacheTimeKey);
+      if (cached && cachedAt && (now - parseInt(cachedAt)) < 2 * 60 * 1000) {
+        return JSON.parse(cached) as FatigueScale[];
+      }
+    } catch { /* ignore */ }
+
+    const flightKey = `get:fatigue-scales:${user.id}`;
+    const existing = inFlight.current.get(flightKey);
+    if (existing) return existing;
+
+    const p = (async () => {
+      try {
+        const response = await fetch('/api/redis?action=get&type=fatigue-scales', {
+          headers: getHeaders()
+        });
+        const result = await response.json();
+        const data = (result.data || []) as FatigueScale[];
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+          sessionStorage.setItem(cacheTimeKey, now.toString());
+        } catch { /* ignore */ }
+        return data;
+      } catch (error) {
+        return [];
+      } finally {
+        inFlight.current.delete(flightKey);
+      }
+    })();
+    inFlight.current.set(flightKey, p);
+    return p;
+  }, [getHeaders, isRedisAvailable, user]);
 
   // Exercise Session methods (placeholder)
-  const saveExerciseSession = async (session: any): Promise<void> => {
+  const saveExerciseSession = useCallback(async (session: any): Promise<void> => {
     if (!isRedisAvailable || !user) return;
 
     try {
@@ -195,27 +279,63 @@ export function useHealthStorage() {
         headers: getHeaders(),
         body: JSON.stringify(session)
       });
+      // Write-through list cache: prepend session
+      try {
+        const cacheKey = `exercise-sessions-${user.id}`;
+        const cacheTimeKey = `${cacheKey}-time`;
+        const cached = sessionStorage.getItem(cacheKey);
+        const list = cached ? (JSON.parse(cached) as any[]) : [];
+        const updated = [session, ...list];
+        sessionStorage.setItem(cacheKey, JSON.stringify(updated));
+        sessionStorage.setItem(cacheTimeKey, Date.now().toString());
+      } catch { /* ignore quota errors */ }
     } catch (error) {
       console.error('Failed to save exercise session:', error);
     }
-  };
+  }, [getHeaders, isRedisAvailable, user]);
 
-  const getExerciseSessions = async (): Promise<any[]> => {
+  const getExerciseSessions = useCallback(async (): Promise<any[]> => {
     if (!isRedisAvailable || !user) return [];
 
+    const cacheKey = `exercise-sessions-${user.id}`;
+    const cacheTimeKey = `${cacheKey}-time`;
+    const now = Date.now();
     try {
-      const response = await fetch('/api/redis?action=get&type=exercise-sessions', {
-        headers: getHeaders()
-      });
-      const result = await response.json();
-      return result.data || [];
-    } catch (error) {
-      return [];
-    }
-  };
+      const cached = sessionStorage.getItem(cacheKey);
+      const cachedAt = sessionStorage.getItem(cacheTimeKey);
+      if (cached && cachedAt && (now - parseInt(cachedAt)) < 2 * 60 * 1000) {
+        return JSON.parse(cached) as any[];
+      }
+    } catch { /* ignore */ }
+
+    const flightKey = `get:exercise-sessions:${user.id}`;
+    const existing = inFlight.current.get(flightKey);
+    if (existing) return existing;
+
+    const p = (async () => {
+      try {
+        const response = await fetch('/api/redis?action=get&type=exercise-sessions', {
+          headers: getHeaders()
+        });
+        const result = await response.json();
+        const data = result.data || [];
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+          sessionStorage.setItem(cacheTimeKey, now.toString());
+        } catch { /* ignore */ }
+        return data;
+      } catch (error) {
+        return [];
+      } finally {
+        inFlight.current.delete(flightKey);
+      }
+    })();
+    inFlight.current.set(flightKey, p);
+    return p;
+  }, [getHeaders, isRedisAvailable, user]);
 
   // Export data
-  const exportAllData = async (): Promise<string> => {
+  const exportAllData = useCallback(async (): Promise<string> => {
     if (!isRedisAvailable || !user) return JSON.stringify({ error: 'No data available' });
 
     try {
@@ -231,9 +351,9 @@ export function useHealthStorage() {
     } catch (error) {
       return JSON.stringify({ error: 'Export failed' });
     }
-  };
+  }, [getHeaders, isRedisAvailable, user]);
 
-  return {
+  const api = useMemo(() => ({
     // Storage status
     isRedisAvailable,
     isLoading,
@@ -254,5 +374,7 @@ export function useHealthStorage() {
     
     // Data management
     exportAllData
-  };
+  }), [isRedisAvailable, isLoading, saveDailyAssessment, getDailyAssessment, getRecentAssessments, saveFatigueScale, getFatigueScales, saveExerciseSession, getExerciseSessions, exportAllData]);
+
+  return api;
 }

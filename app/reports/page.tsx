@@ -1,28 +1,49 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, BarChart3, TrendingUp, Calendar } from 'lucide-react';
+import { Download, BarChart3, TrendingUp, Calendar, Activity } from 'lucide-react';
 import { DailyAssessment, FatigueScale } from '@/lib/storage';
 import { useHealthStorage } from '@/lib/useHealthStorage';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import BottomNavigation from '@/components/BottomNavigation';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  BarChart,
+  Bar,
+  ResponsiveContainer,
+} from 'recharts';
 
 export default function Reports() {
   const [dailyData, setDailyData] = useState<DailyAssessment[]>([]);
   const [fatigueScales, setFatigueScales] = useState<FatigueScale[]>([]);
-  const { getRecentAssessments, getFatigueScales, exportAllData } = useHealthStorage();
+  const { getRecentAssessments, getFatigueScales, getExerciseSessions, exportAllData } = useHealthStorage();
+  const [exerciseSessions, setExerciseSessions] = useState<any[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       const assessments = await getRecentAssessments();
-      const scales = await getFatigueScales();
+  const scales = await getFatigueScales();
+  const sessions = await getExerciseSessions();
       setDailyData(assessments);
       setFatigueScales(scales);
+  setExerciseSessions(sessions);
     };
 
     loadData();
-  }, [getRecentAssessments, getFatigueScales]);
+  }, [getRecentAssessments, getFatigueScales, getExerciseSessions]);
 
   const exportData = async () => {
     const dataStr = await exportAllData();
@@ -44,7 +65,31 @@ export default function Reports() {
     ? Math.round(last30Days.reduce((sum, day) => sum + (day.morningAssessment?.energyWaking || 0), 0) / last30Days.length * 10) / 10
     : 0;
 
-  const exerciseSessions = last30Days.filter(day => day.exerciseSession).length;
+  const exerciseCount = exerciseSessions.filter(s => !!s).length || exerciseSessions.length;
+
+  // Build 30-day timeline with dates and totals
+  const daysBack = 30;
+  const byDate = new Map<string, { date: string; readiness: number; energy: number; minutes: number }>();
+  for (let i = daysBack - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    byDate.set(key, { date: key, readiness: 0, energy: 0, minutes: 0 });
+  }
+  last30Days.forEach(day => {
+    const entry = byDate.get(day.date);
+    if (entry) {
+      entry.readiness = day.morningAssessment?.exerciseReadinessScore || 0;
+      entry.energy = day.morningAssessment?.energyWaking || 0;
+    }
+  });
+  exerciseSessions.forEach(s => {
+    const entry = byDate.get(s.date);
+    if (entry) {
+      entry.minutes += Number(s.duration || 0);
+    }
+  });
+  const timeline = Array.from(byDate.values());
   
   const recentFSS = fatigueScales.filter(s => s.type === 'FSS').slice(-5);
   const recentFACIT = fatigueScales.filter(s => s.type === 'FACIT-F').slice(-5);
@@ -65,7 +110,7 @@ export default function Reports() {
       <div className="px-4 py-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <Button onClick={exportData} variant="outline" size="sm">
+          <Button onClick={exportData} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             <Download size={16} className="mr-2" />
             Export
           </Button>
@@ -107,35 +152,56 @@ export default function Reports() {
           </Card>
         </div>
 
-        {/* Energy Trends */}
+        {/* Trends: Readiness & Energy (Line) */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <TrendingUp className="text-blue-600" size={20} />
-              <span>Energy Trends (Last 14 Days)</span>
+              <span>Readiness & Energy (Last 30 Days)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {last30Days.slice(-14).map((day, index) => (
-                <div key={day.date} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">
-                    {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${(day.morningAssessment?.energyWaking || 0) * 10}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-medium w-6">
-                      {day.morningAssessment?.energyWaking || 0}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ChartContainer
+              config={{
+                readiness: { label: 'Readiness', color: 'hsl(221, 83%, 53%)' },
+                energy: { label: 'Energy', color: 'hsl(142, 76%, 36%)' },
+              }}
+              className="h-64 w-full"
+            >
+              <LineChart data={timeline} margin={{ left: 12, right: 12, top: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} minTickGap={24} />
+                <YAxis yAxisId="left" domain={[0, 50]} tickCount={6} />
+                <YAxis yAxisId="right" orientation="right" domain={[0, 10]} tickCount={6} hide />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Line yAxisId="left" type="monotone" dataKey="readiness" stroke="var(--color-readiness)" strokeWidth={2} dot={false} />
+                <Line yAxisId="right" type="monotone" dataKey="energy" stroke="var(--color-energy)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Exercise Minutes (Bar) */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Activity className="text-green-600" size={20} />
+              <span>Exercise Minutes (Last 30 Days)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{ minutes: { label: 'Minutes', color: 'hsl(24, 95%, 53%)' } }}
+              className="h-64 w-full"
+            >
+              <BarChart data={timeline} margin={{ left: 12, right: 12, top: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} minTickGap={24} />
+                <YAxis />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="minutes" fill="var(--color-minutes)" />
+              </BarChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 
@@ -224,26 +290,7 @@ export default function Reports() {
           </CardContent>
         </Card>
 
-        {/* Healthcare Provider Summary */}
-        <Card className="mb-20">
-          <CardHeader>
-            <CardTitle>Healthcare Provider Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-2">Key Metrics (30 Days)</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Average readiness score: {avgReadinessScore}/50</li>
-                <li>• Average energy level: {avgEnergyLevel}/10</li>
-                <li>• Exercise sessions completed: {exerciseSessions}</li>
-                <li>• Days with tracking data: {last30Days.length}/30</li>
-                {topSymptoms.length > 0 && (
-                  <li>• Most common symptom: {topSymptoms[0][0]} ({topSymptoms[0][1]} days)</li>
-                )}
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
+  {/* Provider summary removed per request */}
       </div>
 
       <BottomNavigation />
