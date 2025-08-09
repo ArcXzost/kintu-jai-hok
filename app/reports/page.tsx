@@ -138,7 +138,7 @@ export default function Reports() {
             <CardContent className="p-4">
               <div className="text-center">
                 <p className="text-sm text-gray-600">Exercise Sessions</p>
-                <p className="text-2xl font-bold text-purple-600">{exerciseSessions}</p>
+                <p className="text-2xl font-bold text-purple-600">{exerciseCount}</p>
               </div>
             </CardContent>
           </Card>
