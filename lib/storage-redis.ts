@@ -1,9 +1,9 @@
-import { createClient } from 'redis';
+import type { RedisClientType } from 'redis';
 import type { 
   DailyAssessment, 
   FatigueScale
 } from './storage';
-import { UserManager } from './user';
+import { getRedisClient } from './redis-connection';
 
 // Types for Redis storage
 type Assessment = DailyAssessment;
@@ -15,202 +15,198 @@ type HealthData = {
 };
 
 export class HealthStorageRedis {
-  private client: any;
-  private isConnected = false;
   private userPrefix: string;
 
   constructor(userId?: string) {
     // Use provided userId or default for server-side calls
     const finalUserId = userId || 'default_user';
     this.userPrefix = `user:${finalUserId}:`;
-    
-    // Initialize Redis client with your URL
-    if (typeof window === 'undefined' && process.env.REDIS_URL) {
-      this.client = createClient({
-        url: process.env.REDIS_URL
-      });
-      
-      this.client.on('error', (err: any) => {
-        this.isConnected = false;
-      });
-      
-      this.client.on('connect', () => {
-        this.isConnected = true;
-      });
-    }
   }
 
-  private async ensureConnection(): Promise<boolean> {
-    if (typeof window !== 'undefined') {
-      return false; // Redis only works server-side
-    }
-    
-    if (!this.client) {
-      return false;
-    }
-
-    if (!this.isConnected) {
-      try {
-        await this.client.connect();
-        this.isConnected = true;
-        return true;
-      } catch (error) {
-        return false;
-      }
-    }
-    
-    return true;
+  private async getClient(): Promise<RedisClientType> {
+    return await getRedisClient();
   }
 
   async isAvailable(): Promise<boolean> {
-    return await this.ensureConnection();
+    try {
+      const client = await this.getClient();
+      await client.ping();
+      return true;
+    } catch (error) {
+      console.error('Redis availability check error:', error);
+      return false;
+    }
   }
 
   // Assessment methods
-  async saveAssessment(assessment: Assessment): Promise<void> {
-    if (!(await this.ensureConnection())) return;
-    
+  async saveAssessment(assessment: Assessment): Promise<boolean> {
     try {
+      const client = await this.getClient();
       const key = `${this.userPrefix}assessment:${assessment.date}`;
-      await this.client.setEx(key, 86400 * 30, JSON.stringify(assessment)); // 30 days TTL
+      
+      // Store assessment with TTL
+      await client.setEx(key, 86400 * 30, JSON.stringify(assessment)); // 30 days TTL
       
       // Add to user's assessments list
-      await this.client.lPush(`${this.userPrefix}assessments`, assessment.date);
+      await client.lPush(`${this.userPrefix}assessments`, assessment.date);
+      return true;
     } catch (error) {
-      // Silent error - no logging
+      console.error('Redis saveAssessment error:', error);
+      return false;
     }
   }
 
   async getAssessment(date: string): Promise<Assessment | null> {
-    if (!(await this.ensureConnection())) return null;
-    
     try {
-      const data = await this.client.get(`${this.userPrefix}assessment:${date}`);
+      const client = await this.getClient();
+      const data = await client.get(`${this.userPrefix}assessment:${date}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
+      console.error('Redis getAssessment error:', error);
       return null;
     }
   }
 
   async getAssessments(): Promise<Assessment[]> {
-    if (!(await this.ensureConnection())) return [];
-    
     try {
-      const dates = await this.client.lRange(`${this.userPrefix}assessments`, 0, -1);
-      const assessments: Assessment[] = [];
+      const client = await this.getClient();
+      const dates = await client.lRange(`${this.userPrefix}assessments`, 0, -1);
+      if (!dates?.length) return [];
+
+      // Use Promise.all to fetch all assessments in parallel
+      const assessments = await Promise.all(
+        dates.map(async (date) => {
+          try {
+            return await this.getAssessment(date);
+          } catch (error) {
+            console.error(`Error fetching assessment for date ${date}:`, error);
+            return null;
+          }
+        })
+      );
       
-      for (const date of dates) {
-        const assessment = await this.getAssessment(date);
-        if (assessment) {
-          assessments.push(assessment);
-        }
-      }
-      
-      return assessments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Filter out nulls and sort by date
+      return assessments
+        .filter((a): a is Assessment => a !== null)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
+      console.error('Redis getAssessments error:', error);
       return [];
     }
   }
 
-  async deleteAssessment(date: string): Promise<void> {
-    if (!(await this.ensureConnection())) return;
-    
+  async deleteAssessment(date: string): Promise<boolean> {
     try {
-      await this.client.del(`${this.userPrefix}assessment:${date}`);
-      await this.client.lRem(`${this.userPrefix}assessments`, 0, date);
+      const client = await this.getClient();
+      await client.del(`${this.userPrefix}assessment:${date}`);
+      await client.lRem(`${this.userPrefix}assessments`, 0, date);
+      return true;
     } catch (error) {
-      // Silent error
+      console.error('Redis deleteAssessment error:', error);
+      return false;
     }
   }
 
   // Fatigue Scale methods
-  async saveFatigueScale(scale: FatigueScale): Promise<void> {
-    if (!(await this.ensureConnection())) return;
-    
+  async saveFatigueScale(scale: FatigueScale): Promise<boolean> {
     try {
+      const client = await this.getClient();
       const key = `${this.userPrefix}fatigue_scale:${scale.id}`;
-      await this.client.setEx(key, 86400 * 30, JSON.stringify(scale)); // 30 days TTL
+      
+      // Store scale with TTL
+      await client.setEx(key, 86400 * 30, JSON.stringify(scale)); // 30 days TTL
       
       // Add to user's fatigue scales list
-      await this.client.lPush(`${this.userPrefix}fatigue_scales`, scale.id);
+      await client.lPush(`${this.userPrefix}fatigue_scales`, scale.id);
+      return true;
     } catch (error) {
-      // Silent error
+      console.error('Redis saveFatigueScale error:', error);
+      return false;
     }
   }
 
   async getFatigueScale(id: string): Promise<FatigueScale | null> {
-    if (!(await this.ensureConnection())) return null;
-    
     try {
-      const data = await this.client.get(`${this.userPrefix}fatigue_scale:${id}`);
+      const client = await this.getClient();
+      const data = await client.get(`${this.userPrefix}fatigue_scale:${id}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
+      console.error('Redis getFatigueScale error:', error);
       return null;
     }
   }
 
   async getFatigueScales(): Promise<FatigueScale[]> {
-    if (!(await this.ensureConnection())) return [];
-    
     try {
-      const ids = await this.client.lRange(`${this.userPrefix}fatigue_scales`, 0, -1);
-      const scales: FatigueScale[] = [];
+      const client = await this.getClient();
+      const ids = await client.lRange(`${this.userPrefix}fatigue_scales`, 0, -1);
+      if (!ids?.length) return [];
+
+      // Use Promise.all to fetch all scales in parallel
+      const scales = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            return await this.getFatigueScale(id);
+          } catch (error) {
+            console.error(`Error fetching fatigue scale ${id}:`, error);
+            return null;
+          }
+        })
+      );
       
-      for (const id of ids) {
-        const scale = await this.getFatigueScale(id);
-        if (scale) {
-          scales.push(scale);
-        }
-      }
-      
-      return scales.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Filter out nulls and sort by date
+      return scales
+        .filter((s): s is FatigueScale => s !== null)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
+      console.error('Redis getFatigueScales error:', error);
       return [];
     }
   }
 
-  async deleteFatigueScale(id: string): Promise<void> {
-    if (!(await this.ensureConnection())) return;
-    
+  async deleteFatigueScale(id: string): Promise<boolean> {
     try {
-      await this.client.del(`${this.userPrefix}fatigue_scale:${id}`);
-      await this.client.lRem(`${this.userPrefix}fatigue_scales`, 0, id);
+      const client = await this.getClient();
+      await client.del(`${this.userPrefix}fatigue_scale:${id}`);
+      await client.lRem(`${this.userPrefix}fatigue_scales`, 0, id);
+      return true;
     } catch (error) {
-      // Silent error
+      console.error('Redis deleteFatigueScale error:', error);
+      return false;
     }
   }
 
   // Exercise Session methods
-  async saveExerciseSession(session: ExerciseSession): Promise<void> {
-    if (!(await this.ensureConnection())) return;
-    
+  async saveExerciseSession(session: ExerciseSession): Promise<boolean> {
     try {
+      const client = await this.getClient();
       const key = `${this.userPrefix}exercise_session:${session.id}`;
-      await this.client.setEx(key, 86400 * 30, JSON.stringify(session)); // 30 days TTL
+      await client.setEx(key, 86400 * 30, JSON.stringify(session)); // 30 days TTL
       
       // Add to user's exercise sessions list
-      await this.client.lPush(`${this.userPrefix}exercise_sessions`, session.id);
+      await client.lPush(`${this.userPrefix}exercise_sessions`, session.id);
+      return true;
     } catch (error) {
-      // Silent error
+      console.error('Redis saveExerciseSession error:', error);
+      return false;
     }
   }
 
   async getExerciseSession(id: string): Promise<ExerciseSession | null> {
-    if (!(await this.ensureConnection())) return null;
-    
     try {
-      const data = await this.client.get(`${this.userPrefix}exercise_session:${id}`);
+      const client = await this.getClient();
+      const data = await client.get(`${this.userPrefix}exercise_session:${id}`);
       return data ? JSON.parse(data) : null;
     } catch (error) {
+      console.error('Redis getExerciseSession error:', error);
       return null;
     }
   }
 
   async getExerciseSessions(): Promise<ExerciseSession[]> {
-    if (!(await this.ensureConnection())) return [];
-    
     try {
-      const ids = await this.client.lRange(`${this.userPrefix}exercise_sessions`, 0, -1);
+      const client = await this.getClient();
+      const ids = await client.lRange(`${this.userPrefix}exercise_sessions`, 0, -1);
       const sessions: ExerciseSession[] = [];
       
       for (const id of ids) {
@@ -222,25 +218,25 @@ export class HealthStorageRedis {
       
       return sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
+      console.error('Redis getExerciseSessions error:', error);
       return [];
     }
   }
 
-  async deleteExerciseSession(id: string): Promise<void> {
-    if (!(await this.ensureConnection())) return;
-    
+  async deleteExerciseSession(id: string): Promise<boolean> {
     try {
-      await this.client.del(`${this.userPrefix}exercise_session:${id}`);
-      await this.client.lRem(`${this.userPrefix}exercise_sessions`, 0, id);
+      const client = await this.getClient();
+      await client.del(`${this.userPrefix}exercise_session:${id}`);
+      await client.lRem(`${this.userPrefix}exercise_sessions`, 0, id);
+      return true;
     } catch (error) {
-      // Silent error
+      console.error('Redis deleteExerciseSession error:', error);
+      return false;
     }
   }
 
   // Migration methods
-  async migrateFromLocalStorage(data: HealthData): Promise<void> {
-    if (!(await this.ensureConnection())) return;
-    
+  async migrateFromLocalStorage(data: HealthData): Promise<boolean> {
     try {
       // Migrate assessments
       for (const assessment of data.assessments) {
@@ -256,27 +252,38 @@ export class HealthStorageRedis {
       for (const session of data.exerciseSessions) {
         await this.saveExerciseSession(session);
       }
+      return true;
     } catch (error) {
-      // Silent error
+      console.error('Redis migrateFromLocalStorage error:', error);
+      return false;
     }
   }
 
   async getAllData(): Promise<HealthData> {
-    return {
-      assessments: await this.getAssessments(),
-      fatigueScales: await this.getFatigueScales(),
-      exerciseSessions: await this.getExerciseSessions()
-    };
+    try {
+      return {
+        assessments: await this.getAssessments(),
+        fatigueScales: await this.getFatigueScales(),
+        exerciseSessions: await this.getExerciseSessions()
+      };
+    } catch (error) {
+      console.error('Redis getAllData error:', error);
+      return {
+        assessments: [],
+        fatigueScales: [],
+        exerciseSessions: []
+      };
+    }
   }
 
-  async clearAllData(): Promise<void> {
-    if (!(await this.ensureConnection())) return;
-    
+  async clearAllData(): Promise<boolean> {
     try {
+      const client = await this.getClient();
+      
       // Get all user-specific keys and delete them
-      const assessmentIds = await this.client.lRange(`${this.userPrefix}assessments`, 0, -1);
-      const fatigueScaleIds = await this.client.lRange(`${this.userPrefix}fatigue_scales`, 0, -1);
-      const exerciseSessionIds = await this.client.lRange(`${this.userPrefix}exercise_sessions`, 0, -1);
+      const assessmentIds = await client.lRange(`${this.userPrefix}assessments`, 0, -1);
+      const fatigueScaleIds = await client.lRange(`${this.userPrefix}fatigue_scales`, 0, -1);
+      const exerciseSessionIds = await client.lRange(`${this.userPrefix}exercise_sessions`, 0, -1);
       
       const keysToDelete = [
         `${this.userPrefix}assessments`,
@@ -288,21 +295,17 @@ export class HealthStorageRedis {
       ];
       
       if (keysToDelete.length > 0) {
-        await this.client.del(keysToDelete);
+        await client.del(keysToDelete);
       }
+      return true;
     } catch (error) {
-      // Silent error
+      console.error('Redis clearAllData error:', error);
+      return false;
     }
   }
 
   async disconnect(): Promise<void> {
-    if (this.client && this.isConnected) {
-      try {
-        await this.client.disconnect();
-        this.isConnected = false;
-      } catch (error) {
-        // Silent error
-      }
-    }
+    // Redis connection is managed by the centralized connection pool
+    // No need to manually disconnect here
   }
 }

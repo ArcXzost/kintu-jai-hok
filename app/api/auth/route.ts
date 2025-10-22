@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from 'redis';
+import { RedisClientType } from 'redis';
+import { getRedisClient } from '@/lib/redis-connection';
 
 interface User {
   id: string;
@@ -14,23 +15,8 @@ interface UserRecord {
 }
 
 class RedisAuth {
-  private client: any;
-  private isConnected = false;
-
-  constructor() {
-    if (typeof window === 'undefined' && process.env.REDIS_URL) {
-      this.client = createClient({
-        url: process.env.REDIS_URL
-      });
-      
-      this.client.on('error', (err: any) => {
-        this.isConnected = false;
-      });
-      
-      this.client.on('connect', () => {
-        this.isConnected = true;
-      });
-    }
+  private async getClient(): Promise<RedisClientType> {
+    return await getRedisClient();
   }
 
   private async ensureConnection(): Promise<boolean> {
@@ -38,21 +24,13 @@ class RedisAuth {
       return false;
     }
     
-    if (!this.client) {
+    try {
+      await this.getClient();
+      return true;
+    } catch (error) {
+      console.error('Redis auth connection error:', error);
       return false;
     }
-
-    if (!this.isConnected) {
-      try {
-        await this.client.connect();
-        this.isConnected = true;
-        return true;
-      } catch (error) {
-        return false;
-      }
-    }
-    
-    return true;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -63,10 +41,12 @@ class RedisAuth {
     if (!(await this.ensureConnection())) return null;
     
     try {
+      const client = await this.getClient();
       const key = `auth:user:${username.toLowerCase()}`;
-      const userData = await this.client.get(key);
+      const userData = await client.get(key);
       return userData ? JSON.parse(userData) : null;
     } catch (error) {
+      console.error('Redis getUser error:', error);
       return null;
     }
   }
@@ -75,10 +55,12 @@ class RedisAuth {
     if (!(await this.ensureConnection())) return false;
     
     try {
+      const client = await this.getClient();
       const key = `auth:user:${username.toLowerCase()}`;
-      await this.client.setEx(key, 86400 * 365, JSON.stringify(userRecord)); // 1 year TTL
+      await client.setEx(key, 86400 * 365, JSON.stringify(userRecord)); // 1 year TTL
       return true;
     } catch (error) {
+      console.error('Redis saveUser error:', error);
       return false;
     }
   }
@@ -87,11 +69,13 @@ class RedisAuth {
     if (!(await this.ensureConnection())) return null;
     
     try {
+      const client = await this.getClient();
       const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const sessionKey = `auth:session:${sessionToken}`;
-      await this.client.setEx(sessionKey, 86400 * 30, userId); // 30 days TTL
+      await client.setEx(sessionKey, 86400 * 30, userId); // 30 days TTL
       return sessionToken;
     } catch (error) {
+      console.error('Redis createSession error:', error);
       return null;
     }
   }
@@ -100,9 +84,11 @@ class RedisAuth {
     if (!(await this.ensureConnection())) return null;
     
     try {
+      const client = await this.getClient();
       const sessionKey = `auth:session:${sessionToken}`;
-      return await this.client.get(sessionKey);
+      return await client.get(sessionKey);
     } catch (error) {
+      console.error('Redis getSession error:', error);
       return null;
     }
   }
@@ -111,22 +97,28 @@ class RedisAuth {
     if (!(await this.ensureConnection())) return null;
     
     try {
+      const client = await this.getClient();
       // Search through all users to find the one with matching ID
       // In a production system, you'd want to store a userId -> username mapping
       const pattern = 'auth:user:*';
-      const keys = await this.client.keys(pattern);
+      const keys = await client.keys(pattern);
       
-      for (const key of keys) {
-        const userData = await this.client.get(key);
+      const userPromises = keys.map(async (key) => {
+        const userData = await client.get(key);
         if (userData) {
           const userRecord: UserRecord = JSON.parse(userData);
           if (userRecord.user.id === userId) {
             return userRecord.user;
           }
         }
-      }
-      return null;
+        return null;
+      });
+
+      const users = await Promise.all(userPromises);
+      const matchedUser = users.find(user => user !== null);
+      return matchedUser || null;
     } catch (error) {
+      console.error('Redis getUserById error:', error);
       return null;
     }
   }
@@ -135,10 +127,12 @@ class RedisAuth {
     if (!(await this.ensureConnection())) return false;
     
     try {
+      const client = await this.getClient();
       const sessionKey = `auth:session:${sessionToken}`;
-      await this.client.del(sessionKey);
+      await client.del(sessionKey);
       return true;
     } catch (error) {
+      console.error('Redis deleteSession error:', error);
       return false;
     }
   }
@@ -180,10 +174,10 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ success: false, error: 'Failed to create session' });
         }
 
-        return NextResponse.json({ 
-          success: true, 
-          user: userRecord.user, 
-          sessionToken 
+        return NextResponse.json({
+          success: true,
+          user: userRecord.user,
+          sessionToken
         });
       }
 
@@ -191,15 +185,7 @@ export async function POST(request: NextRequest) {
         const { username, password, name } = body;
         
         if (!username || !password || !name) {
-          return NextResponse.json({ success: false, error: 'All fields required' });
-        }
-
-        if (username.length < 3) {
-          return NextResponse.json({ success: false, error: 'Username must be at least 3 characters' });
-        }
-
-        if (password.length < 4) {
-          return NextResponse.json({ success: false, error: 'Password must be at least 4 characters' });
+          return NextResponse.json({ success: false, error: 'All fields are required' });
         }
 
         const existingUser = await redisAuth.getUser(username);
@@ -258,16 +244,21 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ success: false, error: 'User not found' });
         }
 
-        return NextResponse.json({ success: true, user });
+        return NextResponse.json({
+          success: true,
+          user,
+          sessionToken
+        });
       }
 
       case 'logout': {
         const { sessionToken } = body;
         
-        if (sessionToken) {
-          await redisAuth.deleteSession(sessionToken);
+        if (!sessionToken) {
+          return NextResponse.json({ success: false, error: 'Session token required' });
         }
 
+        await redisAuth.deleteSession(sessionToken);
         return NextResponse.json({ success: true });
       }
 
@@ -275,41 +266,35 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
   } catch (error) {
+    console.error('Authentication error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
-    const sessionToken = request.headers.get('authorization')?.replace('Bearer ', '');
+    const sessionToken = request.headers.get('x-session-token');
     
+    if (!sessionToken) {
+      return NextResponse.json({ error: 'No session token provided' }, { status: 401 });
+    }
+
     const redisAuth = new RedisAuth();
+    const userId = await redisAuth.getSession(sessionToken);
     
-    if (!(await redisAuth.isAvailable())) {
-      return NextResponse.json({ error: 'Authentication service not available' }, { status: 503 });
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
-    switch (action) {
-      case 'verify': {
-        if (!sessionToken) {
-          return NextResponse.json({ success: false, error: 'Session token required' });
-        }
-
-        const userId = await redisAuth.getSession(sessionToken);
-        
-        if (!userId) {
-          return NextResponse.json({ success: false, error: 'Invalid session' });
-        }
-
-        return NextResponse.json({ success: true, userId });
-      }
-
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    const user = await redisAuth.getUserById(userId);
+    
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+
+    return NextResponse.json({ user });
   } catch (error) {
+    console.error('Authentication error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
