@@ -313,10 +313,10 @@ export default function DailyTracking() {
         </Card>
 
         {/* Save Button */}
-        <div className="fixed bottom-20 left-4 right-4 z-40">
+        <div className="fixed bottom-20 left-4 right-4 z-40 max-w-4xl mx-auto">
           <Button 
             onClick={handleSave} 
-            className="w-full h-12 text-lg"
+            className="w-full h-12 text-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg rounded-xl font-semibold transform transition-transform hover:scale-105"
             disabled={alreadySavedToday}
             title={alreadySavedToday ? 'Assessment already saved for today' : undefined}
           >
