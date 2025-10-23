@@ -837,7 +837,7 @@ export default function ExerciseTracking() {
                   description="How satisfied are you with this exercise session?"
                 />
 
-                <Button onClick={saveSession} className="w-full h-12 text-lg">
+                <Button onClick={saveSession} className="w-full h-12 text-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg rounded-xl font-semibold transform transition-transform hover:scale-105">
                   <Save size={20} className="mr-2" />
                   Save Exercise Session
                 </Button>
