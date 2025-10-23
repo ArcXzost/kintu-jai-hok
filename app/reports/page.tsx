@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Download, BarChart3, TrendingUp, Calendar, Activity } from 'lucide-react';
 import { DailyAssessment, FatigueScale } from '@/lib/storage';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 import { useHealthStorage } from '@/lib/useHealthStorage';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -29,21 +30,33 @@ import {
 export default function Reports() {
   const [dailyData, setDailyData] = useState<DailyAssessment[]>([]);
   const [fatigueScales, setFatigueScales] = useState<FatigueScale[]>([]);
-  const { getRecentAssessments, getFatigueScales, getExerciseSessions, exportAllData } = useHealthStorage();
   const [exerciseSessions, setExerciseSessions] = useState<any[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const { getRecentAssessments, getFatigueScales, getExerciseSessions, exportAllData, isLoading: isStorageLoading } = useHealthStorage();
 
   useEffect(() => {
     const loadData = async () => {
-      const assessments = await getRecentAssessments();
-  const scales = await getFatigueScales();
-  const sessions = await getExerciseSessions();
-      setDailyData(assessments);
-      setFatigueScales(scales);
-  setExerciseSessions(sessions);
+      if (isStorageLoading) return;
+
+      setPageLoading(true);
+      try {
+        const [assessments, scales, sessions] = await Promise.all([
+          getRecentAssessments(),
+          getFatigueScales(),
+          getExerciseSessions()
+        ]);
+        setDailyData(assessments);
+        setFatigueScales(scales);
+        setExerciseSessions(sessions);
+      } catch (error) {
+        console.error("Failed to load reports data:", error);
+      } finally {
+        setPageLoading(false);
+      }
     };
 
     loadData();
-  }, [getRecentAssessments, getFatigueScales, getExerciseSessions]);
+  }, [getRecentAssessments, getFatigueScales, getExerciseSessions, isStorageLoading]);
 
   const exportData = async () => {
     const dataStr = await exportAllData();
@@ -105,11 +118,20 @@ export default function Reports() {
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5);
 
+  if (pageLoading || isStorageLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-6">
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 py-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
+
           <Button onClick={exportData} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
             <Download size={16} className="mr-2" />
             Export

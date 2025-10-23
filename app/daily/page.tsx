@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Save, CheckCircle } from 'lucide-react';
 import { useHealthStorage } from '@/lib/useHealthStorage';
 import { DailyAssessment } from '@/lib/storage';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,6 +26,7 @@ export default function DailyTracking() {
     storageStatus 
   } = useHealthStorage();
   
+  const [pageLoading, setPageLoading] = useState(true);
   const [assessment, setAssessment] = useState<DailyAssessment>({
     date: new Date().toISOString().split('T')[0],
     morningAssessment: {
@@ -51,11 +53,17 @@ export default function DailyTracking() {
 
   useEffect(() => {
     const loadExistingAssessment = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const existing = await getDailyAssessment(today);
-      if (existing) {
-        setAssessment(existing);
-        setAlreadySavedToday(!!existing.morningAssessment);
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const existing = await getDailyAssessment(today);
+        if (existing) {
+          setAssessment(existing);
+          setAlreadySavedToday(!!existing.morningAssessment);
+        }
+      } catch (error) {
+        console.error('Failed to load assessment:', error);
+      } finally {
+        setPageLoading(false);
       }
     };
 
@@ -130,6 +138,14 @@ export default function DailyTracking() {
     if (score >= 20) return 'Rest or gentle activity only';
     return 'Rest recommended - Avoid exercise';
   };
+
+  if (isLoading || pageLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-6">
+        <LoadingSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

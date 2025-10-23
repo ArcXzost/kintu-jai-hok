@@ -137,7 +137,7 @@ export default function Dashboard() {
       weeklyData.length > 0
         ? Math.round(
             (weeklyData.reduce(
-              (sum, day) => sum + (day.morningAssessment?.averageSleep || 0),
+              (sum, day) => sum + (day.morningAssessment?.sleepQuality || 0),
               0
             ) /
               weeklyData.length) *

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useHealthStorage } from '@/lib/useHealthStorage';
 import { DailyAssessment } from '@/lib/storage';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge, badgeVariants } from '@/components/ui/badge';
@@ -309,6 +310,14 @@ export default function ExerciseTracking() {
     return createWorkoutPlan(recommendation.exercises, recommendation.maxDuration, workoutPlanSeed);
   }, [hasCompletedAssessment, todayReadiness, workoutPlanSeed, createWorkoutPlan, library]);
 
+  if (isLoading || !library) {
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-6">
+        <LoadingSkeleton />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="px-4 py-6">
@@ -317,19 +326,12 @@ export default function ExerciseTracking() {
           
           {/* Storage Status Indicator */}
           <div className="flex items-center space-x-2">
-            {isLoading ? (
-              <div className="flex items-center space-x-1 text-gray-500">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                <span className="text-xs">Loading...</span>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-1">
-                <div className={`w-2 h-2 rounded-full ${isRedisAvailable ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                <span className="text-xs text-gray-600">
-                  {isRedisAvailable ? 'Cloud Sync' : 'Local Only'}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center space-x-1">
+              <div className={`w-2 h-2 rounded-full ${isRedisAvailable ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+              <span className="text-xs text-gray-600">
+                {isRedisAvailable ? 'Cloud Sync' : 'Local Only'}
+              </span>
+            </div>
           </div>
         </div>
 
