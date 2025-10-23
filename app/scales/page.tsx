@@ -195,8 +195,8 @@ export default function FatigueScales() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <div className="px-4 py-6 max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Fatigue Assessment Scales</h1>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
