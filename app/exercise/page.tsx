@@ -460,20 +460,20 @@ export default function ExerciseTracking() {
                             {/* Workout Summary */}
                             <Card className="border-none bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
                               <CardContent className="p-4">
-                                <div className="grid grid-cols-3 gap-4 text-center">
+                                <div className="grid grid-cols-3 gap-4 text-center text-white">
                                   <div>
-                                    <p className="text-2xl font-bold text-blue-900">{totalTime}</p>
-                                    <p className="text-xs text-blue-700">Total Minutes</p>
+                                    <p className="text-2xl font-bold">{totalTime}</p>
+                                    <p className="text-xs text-blue-100">Total Minutes</p>
                                   </div>
                                   <div>
-                                    <p className="text-2xl font-bold text-blue-900">{workoutPlan.length}</p>
-                                    <p className="text-xs text-blue-700">Exercises</p>
+                                    <p className="text-2xl font-bold">{workoutPlan.length}</p>
+                                    <p className="text-xs text-blue-100">Exercises</p>
                                   </div>
                                   <div>
-                                    <p className="text-2xl font-bold text-blue-900">
+                                    <p className="text-2xl font-bold">
                                       {new Set(workoutPlan.map(p => p.exercise.category)).size}
                                     </p>
-                                    <p className="text-xs text-blue-700">Categories</p>
+                                    <p className="text-xs text-blue-100">Categories</p>
                                   </div>
                                 </div>
                               </CardContent>
