@@ -256,9 +256,9 @@ export default function DailyTracking() {
         </Card>
 
         {/* Medical Data */}
-        <Card className="mb-20">
+        <Card className="mb-20 border-none shadow-lg backdrop-blur-sm bg-white/90">
           <CardHeader>
-            <CardTitle>Medical Data (Optional)</CardTitle>
+            <CardTitle className="text-xl">Medical Data (Optional)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
