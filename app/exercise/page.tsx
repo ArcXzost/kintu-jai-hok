@@ -365,24 +365,24 @@ export default function ExerciseTracking() {
                   <Card className="border-none bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
                     <CardContent className="p-6 text-center">
                       <div className="space-y-4">
-                        <div className="w-16 h-16 bg-blue-200 rounded-full flex items-center justify-center mx-auto">
-                          <AlertTriangle className="text-blue-600" size={32} />
+                        <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto border-2 border-white/30">
+                          <AlertTriangle className="text-white" size={40} />
                         </div>
-                        <div>
-                          <h3 className="text-xl font-semibold text-blue-900 mb-2">
+                        <div className="text-white">
+                          <h3 className="text-2xl font-semibold mb-3">
                             Complete Your Morning Assessment First
                           </h3>
-                          <p className="text-blue-800 mb-4">
+                          <p className="text-blue-100 mb-4 text-lg">
                             To get personalized exercise recommendations that are safe for your current condition, 
                             please complete today's morning assessment first.
                           </p>
-                          <p className="text-sm text-blue-700 mb-6">
+                          <p className="text-blue-200 text-sm mb-6">
                             This helps us determine your exercise readiness score and recommend the most appropriate 
                             activities for today based on how you're feeling.
                           </p>
                           <Button 
                             onClick={() => router.push('/daily')}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                            className="bg-white text-blue-600 hover:bg-blue-50 px-8 py-4 rounded-xl font-semibold shadow-lg transform transition-transform hover:scale-105"
                           >
                             Go to Morning Assessment
                           </Button>
