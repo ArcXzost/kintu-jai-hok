@@ -196,9 +196,9 @@ export default function Reports() {
         </Card>
 
         {/* Exercise Minutes (Bar) */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-none shadow-lg backdrop-blur-sm bg-white/90">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center space-x-2 text-xl">
               <Activity className="text-green-600" size={20} />
               <span>Exercise Minutes (Last 30 Days)</span>
             </CardTitle>
