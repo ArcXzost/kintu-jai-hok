@@ -203,13 +203,13 @@ export default function DailyTracking() {
               description="How motivated do you feel today?"
             />
 
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-semibold text-blue-900 mb-2">Exercise Readiness Score</h4>
+            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl border-none shadow-lg text-white">
+              <h4 className="font-semibold mb-2">Exercise Readiness Score</h4>
               <div className="flex justify-between items-center">
-                <span className={`text-2xl font-bold ${getReadinessColor(assessment.morningAssessment!.exerciseReadinessScore)}`}>
+                <span className=\"text-3xl font-bold\">
                   {assessment.morningAssessment!.exerciseReadinessScore}/50
                 </span>
-                <span className={`text-sm font-medium ${getReadinessColor(assessment.morningAssessment!.exerciseReadinessScore)}`}>
+                <span className=\"text-sm font-medium bg-white/20 px-3 py-1 rounded-lg backdrop-blur-sm\">
                   {getReadinessText(assessment.morningAssessment!.exerciseReadinessScore)}
                 </span>
               </div>
