@@ -207,9 +207,9 @@ export default function FatigueScales() {
           </TabsList>
 
           <TabsContent value="fss" className="space-y-6">
-            <Card>
+            <Card className="border-none shadow-lg backdrop-blur-sm bg-white/90">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
+                <CardTitle className="flex items-center space-x-2 text-xl">
                   <FileText className="text-blue-600" size={20} />
                   <span>Fatigue Severity Scale (FSS)</span>
                 </CardTitle>
