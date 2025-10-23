@@ -246,14 +246,14 @@ export default function FatigueScales() {
                   </div>
                 ))}
 
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg border-none text-white">
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold text-blue-900">Average Score:</span>
-                    <span className="text-2xl font-bold text-blue-600">
+                    <span className="font-semibold">Average Score:</span>
+                    <span className="text-3xl font-bold">
                       {fssResult.total.toFixed(1)}
                     </span>
                   </div>
-                  <p className="text-blue-800 mt-2">{fssResult.interpretation}</p>
+                  <p className="text-blue-100 mt-2">{fssResult.interpretation}</p>
                 </div>
 
                 <div className="space-y-4">
