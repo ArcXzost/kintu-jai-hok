@@ -689,9 +689,9 @@ export default function ExerciseTracking() {
           </TabsContent>
 
           <TabsContent value="pre" className="space-y-6">
-            <Card>
+            <Card className="border-none shadow-lg backdrop-blur-sm bg-white/90">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
+                <CardTitle className="flex items-center justify-between text-xl">
                   <span>Pre-Exercise Assessment</span>
                   {selectedExercise && (
                     <Badge className="bg-blue-100 text-blue-800">
