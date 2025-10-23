@@ -549,15 +549,15 @@ export default function ExerciseTracking() {
                             </div>
 
                             {/* Start Workout Button */}
-                            <Card className="border-green-200 bg-green-50">
+                            <Card className="border-none bg-gradient-to-br from-green-500 to-green-600 shadow-lg">
                               <CardContent className="p-4 text-center">
                                 <Button
                                   onClick={() => setActiveTab('pre')}
-                                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold"
+                                  className="bg-white text-green-600 hover:bg-green-50 px-8 py-3 text-lg font-semibold rounded-xl shadow-lg transform transition-transform hover:scale-105"
                                 >
                                   🏃‍♀️ Start This Workout
                                 </Button>
-                                <p className="text-sm text-green-700 mt-2">
+                                <p className="text-sm text-green-100 mt-2">
                                   This will guide you through pre-exercise preparation
                                 </p>
                               </CardContent>
