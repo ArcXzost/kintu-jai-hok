@@ -218,9 +218,9 @@ export default function DailyTracking() {
         </Card>
 
         {/* Daily Notes */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-none shadow-lg backdrop-blur-sm bg-white/90">
           <CardHeader>
-            <CardTitle>Daily Notes</CardTitle>
+            <CardTitle className="text-xl">Daily Notes</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
