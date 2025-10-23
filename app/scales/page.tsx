@@ -259,7 +259,7 @@ export default function FatigueScales() {
                 <div className="space-y-4">
                   <Button 
                     onClick={saveFSS} 
-                    className="w-full h-12"
+                    className="w-full h-12 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg rounded-xl font-semibold transform transition-transform hover:scale-105"
                     disabled={submittedToday.fss}
                   >
                     {submittedToday.fss ? (
