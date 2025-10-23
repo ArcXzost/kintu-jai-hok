@@ -233,9 +233,9 @@ export default function DailyTracking() {
         </Card>
 
         {/* Symptoms */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-none shadow-lg backdrop-blur-sm bg-white/90">
           <CardHeader>
-            <CardTitle>Symptoms Today</CardTitle>
+            <CardTitle className="text-xl">Symptoms Today</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
