@@ -271,9 +271,9 @@ export default function Reports() {
         </Card>
 
         {/* Symptom Patterns */}
-        <Card className="mb-20">
+        <Card className="mb-20 border-none shadow-lg backdrop-blur-sm bg-white/90">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center space-x-2 text-xl">
               <Calendar className="text-red-600" size={20} />
               <span>Common Symptoms (Last 30 Days)</span>
             </CardTitle>
