@@ -127,8 +127,8 @@ export default function Reports() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <div className="px-4 py-6 max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
 
