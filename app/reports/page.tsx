@@ -139,39 +139,31 @@ export default function Reports() {
         </div>
 
         {/* Overview Cards */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Avg Readiness</p>
-                <p className="text-2xl font-bold text-blue-600">{avgReadinessScore}/50</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Avg Energy</p>
-                <p className="text-2xl font-bold text-green-600">{avgEnergyLevel}/10</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Exercise Sessions</p>
-                <p className="text-2xl font-bold text-purple-600">{exerciseCount}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Days Tracked</p>
-                <p className="text-2xl font-bold text-orange-600">{last30Days.length}/30</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl p-6 shadow-lg transform transition-transform hover:scale-105">
+            <div className="text-center text-white">
+              <p className="text-blue-100 mb-1">Avg Readiness</p>
+              <p className="text-3xl font-bold">{avgReadinessScore}/50</p>
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-6 shadow-lg transform transition-transform hover:scale-105">
+            <div className="text-center text-white">
+              <p className="text-green-100 mb-1">Avg Energy</p>
+              <p className="text-3xl font-bold">{avgEnergyLevel}/10</p>
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-6 shadow-lg transform transition-transform hover:scale-105">
+            <div className="text-center text-white">
+              <p className="text-purple-100 mb-1">Exercise Sessions</p>
+              <p className="text-3xl font-bold">{exerciseCount}</p>
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-rose-500 to-red-600 rounded-2xl p-6 shadow-lg transform transition-transform hover:scale-105">
+            <div className="text-center text-white">
+              <p className="text-red-100 mb-1">Days Tracked</p>
+              <p className="text-3xl font-bold">{last30Days.length}/30</p>
+            </div>
+          </div>
         </div>
 
         {/* Trends: Readiness & Energy (Line) */}
