@@ -393,7 +393,7 @@ export default function ExerciseTracking() {
                 ) : (
                   <>
                     {/* Readiness Assessment Results */}
-                    <Card className={`${getReadinessRecommendation(todayReadiness).bgColor} border-2`}>
+                    <Card className={`${getReadinessRecommendation(todayReadiness).bgColor} border-none shadow-lg backdrop-blur-sm`}>
                       <CardContent className="p-6">
                         <div className="text-center space-y-4">
                           <div className="text-4xl">{getReadinessRecommendation(todayReadiness).icon}</div>
