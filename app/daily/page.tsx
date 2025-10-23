@@ -206,10 +206,10 @@ export default function DailyTracking() {
             <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl border-none shadow-lg text-white">
               <h4 className="font-semibold mb-2">Exercise Readiness Score</h4>
               <div className="flex justify-between items-center">
-                <span className=\"text-3xl font-bold\">
+                <span className="text-3xl font-bold">
                   {assessment.morningAssessment!.exerciseReadinessScore}/50
                 </span>
-                <span className=\"text-sm font-medium bg-white/20 px-3 py-1 rounded-lg backdrop-blur-sm\">
+                <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-lg backdrop-blur-sm">
                   {getReadinessText(assessment.morningAssessment!.exerciseReadinessScore)}
                 </span>
               </div>
