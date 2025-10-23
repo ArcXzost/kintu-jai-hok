@@ -458,7 +458,7 @@ export default function ExerciseTracking() {
                         return (
                           <div className="space-y-4">
                             {/* Workout Summary */}
-                            <Card className="border-blue-200 bg-blue-50">
+                            <Card className="border-none bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
                               <CardContent className="p-4">
                                 <div className="grid grid-cols-3 gap-4 text-center">
                                   <div>
