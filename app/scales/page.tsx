@@ -328,14 +328,14 @@ export default function FatigueScales() {
                   </div>
                 ))}
 
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg border-none text-white">
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold text-green-900">Total Score:</span>
-                    <span className="text-2xl font-bold text-green-600">
+                    <span className="font-semibold">Total Score:</span>
+                    <span className="text-3xl font-bold">
                       {facitResult.total}/52
                     </span>
                   </div>
-                  <p className="text-green-800 mt-2">{facitResult.interpretation}</p>
+                  <p className="text-green-100 mt-2">{facitResult.interpretation}</p>
                 </div>
 
                 <div className="space-y-4">
