@@ -161,9 +161,11 @@ export default function DailyTracking() {
         </h1>
 
         {/* Morning Assessment */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-none shadow-lg backdrop-blur-sm bg-white/90">
           <CardHeader>
-            <CardTitle>Morning Assessment</CardTitle>
+            <CardTitle className="flex items-center space-x-2 text-xl">
+              <span>Morning Assessment</span>
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <Slider
