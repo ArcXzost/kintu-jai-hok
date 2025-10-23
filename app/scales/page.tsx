@@ -367,9 +367,9 @@ export default function FatigueScales() {
           </TabsContent>
 
           <TabsContent value="history" className="space-y-6">
-            <Card>
+            <Card className="border-none shadow-lg backdrop-blur-sm bg-white/90">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
+                <CardTitle className="flex items-center space-x-2 text-xl">
                   <TrendingUp className="text-purple-600" size={20} />
                   <span>Assessment History</span>
                 </CardTitle>
