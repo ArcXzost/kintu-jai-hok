@@ -285,9 +285,9 @@ export default function FatigueScales() {
           </TabsContent>
 
           <TabsContent value="facit" className="space-y-6">
-            <Card>
+            <Card className="border-none shadow-lg backdrop-blur-sm bg-white/90">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
+                <CardTitle className="flex items-center space-x-2 text-xl">
                   <FileText className="text-green-600" size={20} />
                   <span>FACIT-Fatigue Scale</span>
                 </CardTitle>
