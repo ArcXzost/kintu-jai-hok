@@ -492,7 +492,7 @@ export default function ExerciseTracking() {
                                 const CategoryIcon = categoryInfo[planItem.exercise.category as keyof typeof categoryInfo].icon;
                                 
                                 return (
-                                  <Card key={`${planItem.exercise.id}-${index}`} className={`border-l-4 ${categoryInfo[planItem.exercise.category as keyof typeof categoryInfo].bgColor}`}>
+                                  <Card key={`${planItem.exercise.id}-${index}`} className={`border-none shadow-lg ${categoryInfo[planItem.exercise.category as keyof typeof categoryInfo].bgColor}`}>
                                     <CardContent className="p-4">
                                       <div className="flex items-start justify-between">
                                         <div className="flex-1">
