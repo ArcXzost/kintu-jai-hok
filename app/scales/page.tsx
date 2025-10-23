@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Save, FileText, TrendingUp } from 'lucide-react';
 import { useHealthStorage } from '@/lib/useHealthStorage';
 import { FatigueScale } from '@/lib/storage';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,17 +51,53 @@ export default function FatigueScales() {
   const [fssScores, setFssScores] = useState<number[]>(new Array(9).fill(1));
   const [facitScores, setFacitScores] = useState<number[]>(new Array(13).fill(0));
   const [recentScales, setRecentScales] = useState<FatigueScale[]>([]);
+  const [submittedToday, setSubmittedToday] = useState<{ fss: boolean; facit: boolean }>({ fss: false, facit: false });
+
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     const loadScales = async () => {
-      const scales = await getFatigueScales();
-      setRecentScales(scales.slice(-10));
+      if (isLoading) return;
+
+      setPageLoading(true);
+      try {
+        const scales = await getFatigueScales();
+        
+        // Sort scales by date, most recent first
+        const sortedScales = scales.sort((a, b) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
+        setRecentScales(sortedScales.slice(0, 10));
+
+        // Check if scales were submitted today
+        const today = new Date().toISOString().split('T')[0];
+        const todayScales = sortedScales.filter(scale => scale.date === today);
+        
+        setSubmittedToday({
+          fss: todayScales.some(scale => scale.type === 'FSS'),
+          facit: todayScales.some(scale => scale.type === 'FACIT-F')
+        });
+
+        // Load most recent scale scores if available
+        const lastFSS = sortedScales.find(scale => scale.type === 'FSS');
+        const lastFACIT = sortedScales.find(scale => scale.type === 'FACIT-F');
+
+        if (lastFSS && !submittedToday.fss) {
+          setFssScores(lastFSS.scores);
+        }
+        if (lastFACIT && !submittedToday.facit) {
+          setFacitScores(lastFACIT.scores);
+        }
+      } catch (error) {
+        console.error('Failed to load fatigue scales:', error);
+      } finally {
+        setPageLoading(false);
+      }
     };
 
-    if (!isLoading) {
-      loadScales();
-    }
-  }, [getFatigueScales, isLoading]);
+    loadScales();
+  }, [getFatigueScales, isLoading, submittedToday.fss, submittedToday.facit]);
 
   const calculateFSS = (scores: number[]) => {
     const total = scores.reduce((sum, score) => sum + score, 0);
@@ -95,6 +132,11 @@ export default function FatigueScales() {
   };
 
   const saveFSS = async () => {
+    if (submittedToday.fss) {
+      alert('FSS assessment already submitted today.');
+      return;
+    }
+
     const result = calculateFSS(fssScores);
     const scale: FatigueScale = {
       id: Date.now().toString(),
@@ -108,6 +150,7 @@ export default function FatigueScales() {
     try {
       await saveFatigueScale(scale);
       setRecentScales(prev => [...prev, scale].slice(-10));
+      setSubmittedToday(prev => ({ ...prev, fss: true }));
       alert('FSS assessment saved!' + (isRedisAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
     } catch (error) {
       alert('Error saving FSS assessment. Please try again.');
@@ -115,6 +158,11 @@ export default function FatigueScales() {
   };
 
   const saveFACIT = async () => {
+    if (submittedToday.facit) {
+      alert('FACIT-F assessment already submitted today.');
+      return;
+    }
+
     const result = calculateFACIT(facitScores);
     const scale: FatigueScale = {
       id: Date.now().toString(),
@@ -128,6 +176,7 @@ export default function FatigueScales() {
     try {
       await saveFatigueScale(scale);
       setRecentScales(prev => [...prev, scale].slice(-10));
+      setSubmittedToday(prev => ({ ...prev, facit: true }));
       alert('FACIT-F assessment saved!' + (isRedisAvailable ? ' (Synced to cloud)' : ' (Saved locally)'));
     } catch (error) {
       alert('Error saving FACIT-F assessment. Please try again.');
@@ -136,6 +185,14 @@ export default function FatigueScales() {
 
   const fssResult = calculateFSS(fssScores);
   const facitResult = calculateFACIT(facitScores);
+
+  if (isLoading || pageLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-6">
+        <LoadingSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -199,10 +256,30 @@ export default function FatigueScales() {
                   <p className="text-blue-800 mt-2">{fssResult.interpretation}</p>
                 </div>
 
-                <Button onClick={saveFSS} className="w-full h-12">
-                  <Save size={20} className="mr-2" />
-                  Save FSS Assessment
-                </Button>
+                <div className="space-y-4">
+                  <Button 
+                    onClick={saveFSS} 
+                    className="w-full h-12"
+                    disabled={submittedToday.fss}
+                  >
+                    {submittedToday.fss ? (
+                      <>
+                        <FileText size={20} className="mr-2" />
+                        Already Submitted Today
+                      </>
+                    ) : (
+                      <>
+                        <Save size={20} className="mr-2" />
+                        Save FSS Assessment
+                      </>
+                    )}
+                  </Button>
+                  {submittedToday.fss && (
+                    <p className="text-sm text-center text-gray-500">
+                      You can submit another FSS assessment tomorrow
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -261,10 +338,31 @@ export default function FatigueScales() {
                   <p className="text-green-800 mt-2">{facitResult.interpretation}</p>
                 </div>
 
-                <Button onClick={saveFACIT} className="w-full h-12 bg-green-600 hover:bg-green-700">
-                  <Save size={20} className="mr-2" />
-                  Save FACIT-F Assessment
-                </Button>
+                <div className="space-y-4">
+                  <Button 
+                    onClick={saveFACIT} 
+                    variant="secondary"
+                    className="w-full h-12 bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400 disabled:text-gray-300 disabled:cursor-not-allowed"
+                    disabled={submittedToday.facit}
+                  >
+                    {submittedToday.facit ? (
+                      <>
+                        <FileText size={20} className="mr-2" />
+                        Already Submitted Today
+                      </>
+                    ) : (
+                      <>
+                        <Save size={20} className="mr-2" />
+                        Save FACIT-F Assessment
+                      </>
+                    )}
+                  </Button>
+                  {submittedToday.facit && (
+                    <p className="text-sm text-center text-gray-500">
+                      You can submit another FACIT-F assessment tomorrow
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -284,7 +382,7 @@ export default function FatigueScales() {
                   </p>
                 ) : (
                   <div className="space-y-4">
-                    {recentScales.reverse().map((scale) => (
+                    {recentScales.map((scale) => (
                       <div key={scale.id} className="bg-gray-50 p-4 rounded-lg">
                         <div className="flex justify-between items-start">
                           <div>
