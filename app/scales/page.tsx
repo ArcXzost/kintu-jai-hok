@@ -341,8 +341,7 @@ export default function FatigueScales() {
                 <div className="space-y-4">
                   <Button 
                     onClick={saveFACIT} 
-                    variant="secondary"
-                    className="w-full h-12 bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400 disabled:text-gray-300 disabled:cursor-not-allowed"
+                    className="w-full h-12 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg rounded-xl font-semibold transform transition-transform hover:scale-105 disabled:bg-gray-400 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed disabled:transform-none"
                     disabled={submittedToday.facit}
                   >
                     {submittedToday.facit ? (
