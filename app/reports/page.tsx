@@ -167,9 +167,9 @@ export default function Reports() {
         </div>
 
         {/* Trends: Readiness & Energy (Line) */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-none shadow-lg backdrop-blur-sm bg-white/90">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center space-x-2 text-xl">
               <TrendingUp className="text-blue-600" size={20} />
               <span>Readiness & Energy (Last 30 Days)</span>
             </CardTitle>
