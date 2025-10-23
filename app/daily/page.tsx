@@ -148,12 +148,12 @@ export default function DailyTracking() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <div className="px-4 py-6 max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center justify-between">
           <span>Daily Tracking</span>
           {alreadySavedToday && (
-            <span className="inline-flex items-center text-sm text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded">
+            <span className="inline-flex items-center text-sm text-white bg-gradient-to-r from-green-500 to-green-600 px-3 py-1.5 rounded-xl shadow-lg">
               <CheckCircle size={16} className="mr-1" />
               Completed
             </span>
