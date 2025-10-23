@@ -220,9 +220,9 @@ export default function Reports() {
         </Card>
 
         {/* Fatigue Scale History */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-none shadow-lg backdrop-blur-sm bg-white/90">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center space-x-2 text-xl">
               <BarChart3 className="text-green-600" size={20} />
               <span>Fatigue Scale Trends</span>
             </CardTitle>
