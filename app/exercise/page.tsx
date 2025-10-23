@@ -771,9 +771,9 @@ export default function ExerciseTracking() {
           {/* During tab removed */}
 
           <TabsContent value="post" className="space-y-6">
-            <Card>
+            <Card className="border-none shadow-lg backdrop-blur-sm bg-white/90">
               <CardHeader>
-                <CardTitle>Post-Exercise Recovery</CardTitle>
+                <CardTitle className="text-xl">Post-Exercise Recovery</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <Slider
