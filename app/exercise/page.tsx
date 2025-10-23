@@ -362,7 +362,7 @@ export default function ExerciseTracking() {
               <div className="space-y-6">
                 {/* Morning Assessment Prompt or Readiness Display */}
                 {!hasCompletedAssessment ? (
-                  <Card className="border-blue-200 bg-blue-50">
+                  <Card className="border-none bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
                     <CardContent className="p-6 text-center">
                       <div className="space-y-4">
                         <div className="w-16 h-16 bg-blue-200 rounded-full flex items-center justify-center mx-auto">
